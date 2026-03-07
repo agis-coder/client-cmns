@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
@@ -10,8 +10,9 @@ import {
     InvestorData,
 } from "@/interfaces/project-category"
 import { getProjectsByCategory } from "@/services/project-data"
-import { User, Mail, Phone, X, ChevronLeft, ChevronRight } from "lucide-react"
+import { User, Mail, Phone, X, ChevronLeft, ChevronRight, Search } from "lucide-react"
 import { getListCustomerByProject } from "@/services/customer-data"
+import { Input } from "@/components/ui/input"
 
 interface ProjectBrowserProps {
     initialCategory: ProjectCategory
@@ -40,6 +41,9 @@ export function ProjectBrowser({
     const [customers, setCustomers] = useState<CustomerData[]>([])
     const [selectedProject, setSelectedProject] = useState<string>("")
 
+    // Search state
+    const [searchTerm, setSearchTerm] = useState("")
+
     // Pagination state
     const [currentPage, setCurrentPage] = useState(1)
     const itemsPerPage = 100
@@ -64,6 +68,7 @@ export function ProjectBrowser({
         setIsModalOpen(true)
         setModalLoading(true)
         setCurrentPage(1)
+        setSearchTerm("") // Reset search when opening new project
 
         try {
             const result = await getListCustomerByProject(project_id)
@@ -91,13 +96,31 @@ export function ProjectBrowser({
         setCustomers([])
         setSelectedProject("")
         setCurrentPage(1)
+        setSearchTerm("")
     }
 
+    // Filter customers based on search term
+    const filteredCustomers = useMemo(() => {
+        if (!searchTerm.trim()) return customers
+
+        const searchLower = searchTerm.toLowerCase().trim()
+        return customers.filter(customer => {
+            // Kiểm tra tên khách hàng (ưu tiên)
+            const nameMatch = customer.customer_name.toLowerCase().includes(searchLower)
+
+            // Kiểm tra địa chỉ nếu có
+            const addressMatch = customer.address &&
+                customer.address.toLowerCase().includes(searchLower)
+
+            return nameMatch || addressMatch
+        })
+    }, [customers, searchTerm])
+
     // Pagination calculations
-    const totalPages = Math.ceil(customers.length / itemsPerPage)
+    const totalPages = Math.ceil(filteredCustomers.length / itemsPerPage)
     const startIndex = (currentPage - 1) * itemsPerPage
     const endIndex = startIndex + itemsPerPage
-    const currentCustomers = customers.slice(startIndex, endIndex)
+    const currentCustomers = filteredCustomers.slice(startIndex, endIndex)
 
     const goToPage = (page: number) => {
         setCurrentPage(page)
@@ -232,8 +255,30 @@ export function ProjectBrowser({
                             </button>
                         </div>
 
+                        {/* Search Bar */}
+                        <div className="px-6 py-4 border-b">
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                                <Input
+                                    type="text"
+                                    placeholder="Tìm kiếm theo tên khách hàng hoặc địa chỉ..."
+                                    value={searchTerm}
+                                    onChange={(e) => {
+                                        setSearchTerm(e.target.value)
+                                        setCurrentPage(1) // Reset to first page when searching
+                                    }}
+                                    className="pl-10 pr-4 py-2 w-full border rounded-md focus:outline-none focus:ring-2 focus:ring-black/20"
+                                />
+                            </div>
+                            {searchTerm && (
+                                <div className="mt-2 text-sm text-gray-500">
+                                    Tìm thấy {filteredCustomers.length} kết quả cho "{searchTerm}"
+                                </div>
+                            )}
+                        </div>
+
                         {/* Modal Body */}
-                        <div className="flex-1 overflow-hidden p-6">
+                        <div className="flex-1 overflow-hidden p-6 pt-0">
                             {modalLoading ? (
                                 <div className="h-full flex items-center justify-center">
                                     <div className="text-gray-500">Đang tải dữ liệu...</div>
@@ -241,7 +286,7 @@ export function ProjectBrowser({
                             ) : (
                                 <>
                                     {/* Table */}
-                                    <ScrollArea className="h-[calc(90vh-200px)]">
+                                    <ScrollArea className="h-[calc(90vh-280px)]">
                                         <table className="w-full border-collapse">
                                             <thead className="bg-gray-50 sticky top-0 z-10">
                                                 <tr>
@@ -252,12 +297,14 @@ export function ProjectBrowser({
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                {currentCustomers.map((customer, index) => (
+                                                {currentCustomers.map((customer) => (
                                                     <tr key={customer.customer_id} className="hover:bg-gray-50 transition group">
-
                                                         <td className="px-4 py-3 text-sm font-medium border-b">
                                                             <div className="truncate max-w-[200px]" title={customer.customer_name}>
                                                                 {customer.customer_name}
+                                                                {searchTerm && customer.customer_name.toLowerCase().includes(searchTerm.toLowerCase()) && (
+                                                                    <span className="ml-2 text-xs text-blue-600 font-normal">(tên)</span>
+                                                                )}
                                                             </div>
                                                         </td>
                                                         <td className="px-4 py-3 text-sm border-b">
@@ -268,6 +315,9 @@ export function ProjectBrowser({
                                                         <td className="px-4 py-3 text-sm border-b">
                                                             <div className="truncate max-w-[300px] text-gray-600" title={customer.address || ""}>
                                                                 {customer.address || "-"}
+                                                                {searchTerm && customer.address?.toLowerCase().includes(searchTerm.toLowerCase()) && (
+                                                                    <span className="ml-2 text-xs text-blue-600 font-normal">(địa chỉ)</span>
+                                                                )}
                                                             </div>
                                                         </td>
                                                         <td className="px-4 py-3 text-sm border-b">
@@ -280,20 +330,20 @@ export function ProjectBrowser({
                                             </tbody>
                                         </table>
 
-                                        {customers.length === 0 && (
+                                        {filteredCustomers.length === 0 && (
                                             <div className="text-center py-12 text-gray-400">
-                                                Không có dữ liệu khách hàng
+                                                {searchTerm ? "Không tìm thấy khách hàng phù hợp" : "Không có dữ liệu khách hàng"}
                                             </div>
                                         )}
                                     </ScrollArea>
 
                                     {/* Pagination */}
-                                    {customers.length > 0 && (
+                                    {filteredCustomers.length > 0 && (
                                         <div className="mt-4 flex items-center justify-between border-t pt-4 bg-white">
                                             <div className="text-sm text-gray-500">
                                                 Hiển thị <span className="font-medium">{startIndex + 1}</span> -{' '}
-                                                <span className="font-medium">{Math.min(endIndex, customers.length)}</span> /{' '}
-                                                <span className="font-medium">{customers.length}</span> khách hàng
+                                                <span className="font-medium">{Math.min(endIndex, filteredCustomers.length)}</span> /{' '}
+                                                <span className="font-medium">{filteredCustomers.length}</span> khách hàng
                                             </div>
                                             <div className="flex items-center gap-1">
                                                 <button

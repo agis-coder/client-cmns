@@ -84,38 +84,9 @@ export function Combobox({
                     </CommandEmpty>
 
                     <CommandGroup className="p-1 overflow-auto" style={{ maxHeight: height }}>
-                        <CommandItem
-                            value="all"
-                            onSelect={() => {
-                                onChange("all")
-                                setOpen(false)
-                            }}
-                            className={cn(
-                                "flex items-center px-3 py-2.5 rounded-lg",
-                                "text-sm",
-                                "cursor-pointer",
-                                "hover:bg-gray-50 dark:hover:bg-gray-900",
-                                "data-[selected]:bg-transparent",
-                                "aria-selected:bg-gray-50 dark:aria-selected:bg-gray-900"
-                            )}
-                        >
-                            <div className={cn(
-                                "w-5 h-5 rounded-md mr-3",
-                                "flex items-center justify-center",
-                                "border border-gray-300 dark:border-gray-700",
-                                value === "all" ? "border-blue-500 bg-blue-500 dark:border-blue-400 dark:bg-blue-400" : "bg-transparent"
-                            )}>
-                                {value === "all" && (
-                                    <Check className="h-3.5 w-3.5 text-white" />
-                                )}
-                            </div>
-                            <span className={cn(
-                                "text-gray-900 dark:text-gray-100",
-                                value === "all" && "font-medium"
-                            )}>
-                                Tất cả
-                            </span>
-                        </CommandItem>
+
+
+
 
                         {options.map((o) => (
                             <CommandItem

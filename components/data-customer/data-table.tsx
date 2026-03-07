@@ -19,6 +19,11 @@ const getProjectSources = (projects: any): string[] => {
   return Array.from(new Set(projects.map((p) => p.source_details).filter(Boolean)))
 }
 
+type Project = {
+  id: string
+  project_name: string
+}
+
 export function DataTable({ data }: DataTableProps) {
 
   const router = useRouter()
@@ -38,12 +43,13 @@ export function DataTable({ data }: DataTableProps) {
   const [totalPages, setTotalPages] = React.useState(1)
   const pageSize = 100
 
-  const [sourceFilter, setSourceFilter] = React.useState("all")
+  const [sourceFilter, setSourceFilter] = React.useState<ProjectCategory | "all">(ProjectCategory.BDS)
   const [investorFilter, setInvestorFilter] = React.useState("all")
-  const [projectFilter, setProjectFilter] = React.useState("all")
+  const [projectFilter, setProjectFilter] = React.useState<string | "all">("all")
+
 
   const [investorOptions, setInvestorOptions] = React.useState<string[]>([])
-  const [projectOptions, setProjectOptions] = React.useState<string[]>([])
+  const [projectOptions, setProjectOptions] = React.useState<Project[]>([])
 
   const [currentPage, setCurrentPage] = React.useState(1)
   const [rowSelection, setRowSelection] = React.useState({})
@@ -57,24 +63,45 @@ export function DataTable({ data }: DataTableProps) {
 
 
   React.useEffect(() => {
-    const investor = investorFilter === "all" ? undefined : investorFilter
-    fetchSubdivisionsBySource(investor).then((projects) => {
-      setProjectOptions(projects ?? [])
+    if (investorFilter === "all") {
+      setProjectOptions([])
       setProjectFilter("all")
+      return
+    }
+
+    setProjectFilter("all")
+
+    fetchSubdivisionsBySource(investorFilter).then((projects) => {
+      const normalized: Project[] = (projects ?? []).map((p: any) => ({
+        id: String(p.id),
+        project_name: String(p.project_name),
+      }))
+
+      setProjectOptions(normalized)
     })
   }, [investorFilter])
 
-
   React.useEffect(() => {
     setLoading(true)
-    fetchAllCustomers(currentPage, debouncedSearch || undefined, undefined, sourceFilter !== "all" ? sourceFilter : undefined, projectFilter !== "all" ? projectFilter : undefined, countryFilter, birthdayFilter, purchaseSort).then((res) => {
-      setTableData(res.data ?? [])
-      setTotalPages(res.totalPages ?? 1)
-    }).finally(() => {
-      setLoading(false)
-    })
 
-  }, [currentPage, debouncedSearch, sourceFilter, projectFilter, quickFilter])
+    fetchAllCustomers(
+      currentPage,
+      debouncedSearch || undefined,
+      investorFilter !== "all" ? investorFilter : undefined,
+      projectFilter !== "all" ? projectFilter : undefined,
+      countryFilter,
+      birthdayFilter,
+      purchaseSort
+    )
+      .then((res) => {
+        setTableData(res.data ?? [])
+        setTotalPages(res.totalPages ?? 1)
+      })
+      .finally(() => {
+        setLoading(false)
+      })
+
+  }, [currentPage, debouncedSearch, projectFilter, quickFilter])
 
   const paginatedData = React.useMemo(() =>
     tableData.map((c: any) => ({
@@ -92,11 +119,11 @@ export function DataTable({ data }: DataTableProps) {
     ), [table.getSelectedRowModel().rows]
   )
 
+  console.log('projectFilter:', projectFilter)
+
   return (
     <div className="space-y-4">
-
       <div className="flex flex-wrap gap-2">
-
         <div className="relative flex-1">
           <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -122,6 +149,7 @@ export function DataTable({ data }: DataTableProps) {
           onChange={(v) => setQuickFilter(v as any)}
           title="Bộ lọc tổng hợp"
           options={[
+            { value: "all", label: "Tất cả khách hàng" },
             { value: "birthday_today", label: "Sinh nhật hôm nay" },
             { value: "birthday_tomorrow", label: "Sinh nhật ngày mai" },
             { value: "purchase_most", label: "Khách hàng mua nhiều nhất" },
@@ -133,7 +161,7 @@ export function DataTable({ data }: DataTableProps) {
 
         <Combobox
           value={sourceFilter}
-          onChange={setSourceFilter}
+          onChange={(v) => setSourceFilter(v as "all" | ProjectCategory)}
           title="Danh mục"
           options={Object.values(ProjectCategory).map((c) => ({
             value: c,
@@ -154,12 +182,12 @@ export function DataTable({ data }: DataTableProps) {
 
         <Combobox
           value={projectFilter}
-          onChange={setProjectFilter}
+          onChange={(v: string) => setProjectFilter(v)}
           title="Dự án"
-          disabled={investorFilter === "all" || !Array.isArray(projectOptions) || projectOptions.length === 0}
-          options={(Array.isArray(projectOptions) ? projectOptions : []).map((p) => ({
-            value: p,
-            label: p,
+          disabled={investorFilter === "all" || projectOptions.length === 0}
+          options={projectOptions.map((p) => ({
+            value: String(p.id),
+            label: p.project_name,
           }))}
         />
 

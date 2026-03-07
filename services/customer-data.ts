@@ -3,20 +3,29 @@ import { Customer, ImportResult, ImportType, ProjectsBySourceResponse, Subdivisi
 import { SendBulkMailPayload } from "@/interfaces/mail";
 import { api } from "@/lib/axios";
 
-export async function fetchAllCustomers(page: number, searchTerm?: string, customerName?: string, source?: string, subdivision?: string, country?: 'vn' | 'nn', birthday?: 'today' | 'tomorrow', sortByPurchase?: 'most' | 'least'): Promise<CustomerApiResponse> {
+export async function fetchAllCustomers(
+    page: number,
+    searchTerm?: string,
+    source?: string,
+    projectId?: string,
+    country?: 'vn' | 'nn',
+    birthday?: 'today' | 'tomorrow',
+    sortByPurchase?: 'most' | 'least'
+): Promise<CustomerApiResponse> {
+
     const response = await api.get<CustomerApiResponse>('/customers', {
         params: {
             page,
-            pageSize: 100,
+            pageSize: 30,
             search: searchTerm || undefined,
-            customerName: customerName || undefined,
             source: source || undefined,
-            subdivision: subdivision || undefined,
+            projectId: projectId || undefined,
             country: country || undefined,
             birthday: birthday || undefined,
             sortByPurchase: sortByPurchase || undefined,
         },
     })
+
     return response.data
 }
 
@@ -43,6 +52,7 @@ export async function fetchProjectsBySource(source?: string): Promise<string[]> 
 export async function fetchSubdivisionsBySource(investor?: string): Promise<string[]> {
     try {
         const response = await api.get<string[]>("/customers/projects-by-investor", { params: { investor } })
+        console.log('response:', response.data)
         return response.data ?? []
     } catch (error) {
         console.error("Error fetching subdivisions:", error)
@@ -62,6 +72,11 @@ export async function getListCustomerByProject(project_id: string): Promise<Cust
         console.error("Error fetching customers:", error);
         return null;
     }
+}
+
+export async function getCustomerProjectUnits(customerId: string, projectId: string) {
+    const res = await api.get(`/customers/${customerId}/projects/${projectId}/units`)
+    return res.data
 }
 
 export async function importCustomersExcel(file: File, type: ImportType = "new-sale"): Promise<ImportResult> {
