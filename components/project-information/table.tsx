@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import React, { useState, useMemo } from "react"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
@@ -13,6 +13,8 @@ import { getProjectsByCategory } from "@/services/project-data"
 import { User, Mail, Phone, X, ChevronLeft, ChevronRight, Search } from "lucide-react"
 import { getListCustomerByProject } from "@/services/customer-data"
 import { Input } from "@/components/ui/input"
+import { Button } from "../ui/button"
+import { useRouter } from "next/navigation"
 
 interface ProjectBrowserProps {
     initialCategory: ProjectCategory
@@ -23,6 +25,7 @@ interface CustomerData {
     customer_id: string
     customer_name: string
     phone: string
+    email: string
     address: string | null
     total_units: number
 }
@@ -35,6 +38,7 @@ export function ProjectBrowser({
     const [data, setData] = useState<InvestorData[]>(initialData)
     const [loading, setLoading] = useState(false)
 
+    const router = useRouter()
     // Modal state
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [modalLoading, setModalLoading] = useState(false)
@@ -77,6 +81,7 @@ export function ProjectBrowser({
                 const mappedCustomers: CustomerData[] = result.map((customer: any) => ({
                     customer_id: customer.customer_id,
                     customer_name: customer.customer_name,
+                    email: customer.email,
                     phone: customer.phone || "",
                     address: customer.address || null,
                     total_units: customer.total_units
@@ -125,6 +130,31 @@ export function ProjectBrowser({
     const goToPage = (page: number) => {
         setCurrentPage(page)
     }
+
+    const [selectedEmails, setSelectedEmails] = useState<string[]>([])
+
+    const toggleSelectEmail = (email: string) => {
+        setSelectedEmails((prev) =>
+            prev.includes(email)
+                ? prev.filter((e) => e !== email)
+                : [...prev, email]
+        )
+    }
+
+    const toggleSelectAll = () => {
+        const emails = currentCustomers
+            .filter((c) => c.email)
+            .map((c) => c.email)
+
+        const allSelected = emails.every((email) => selectedEmails.includes(email))
+
+        if (allSelected) {
+            setSelectedEmails((prev) => prev.filter((email) => !emails.includes(email)))
+        } else {
+            setSelectedEmails((prev) => [...new Set([...prev, ...emails])])
+        }
+    }
+
 
     return (
         <div className="flex h-[90vh] bg-background relative">
@@ -255,7 +285,16 @@ export function ProjectBrowser({
                             </button>
                         </div>
 
-                        {/* Search Bar */}
+                        {selectedEmails.length > 0 && (
+                            <Button
+                                onClick={() => {
+                                    sessionStorage.setItem("mail_recipients", JSON.stringify(selectedEmails))
+                                    router.push("/sendmail")
+                                }}
+                            >
+                                Gửi mail ({selectedEmails.length})
+                            </Button>
+                        )}
                         <div className="px-6 py-4 border-b">
                             <div className="relative">
                                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
@@ -288,10 +327,22 @@ export function ProjectBrowser({
                                     {/* Table */}
                                     <ScrollArea className="h-[calc(90vh-280px)]">
                                         <table className="w-full border-collapse">
+                                            <th className="px-4 py-3 border-b text-center w-10">
+                                                <input
+                                                    type="checkbox"
+                                                    onChange={toggleSelectAll}
+                                                    checked={
+                                                        currentCustomers
+                                                            .filter((c) => c.email)
+                                                            .every((c) => selectedEmails.includes(c.email))
+                                                    }
+                                                />
+                                            </th>
                                             <thead className="bg-gray-50 sticky top-0 z-10">
                                                 <tr>
                                                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600 border-b min-w-[200px]">Tên khách hàng</th>
                                                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600 border-b w-32">Số điện thoại</th>
+                                                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600 border-b w-32">Email</th>
                                                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600 border-b min-w-[300px]">Địa chỉ</th>
                                                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600 border-b w-20">Số căn đã mua</th>
                                                 </tr>
@@ -299,6 +350,16 @@ export function ProjectBrowser({
                                             <tbody>
                                                 {currentCustomers.map((customer) => (
                                                     <tr key={customer.customer_id} className="hover:bg-gray-50 transition group">
+                                                        <td className="px-4 py-3 border-b text-center">
+                                                            {customer.email && (
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={selectedEmails.includes(customer.email)}
+                                                                    onChange={() => toggleSelectEmail(customer.email)}
+                                                                    className="w-4 h-4"
+                                                                />
+                                                            )}
+                                                        </td>
                                                         <td className="px-4 py-3 text-sm font-medium border-b">
                                                             <div className="truncate max-w-[200px]" title={customer.customer_name}>
                                                                 {customer.customer_name}
@@ -310,6 +371,11 @@ export function ProjectBrowser({
                                                         <td className="px-4 py-3 text-sm border-b">
                                                             <span className="font-mono text-gray-600">
                                                                 {customer.phone || "-"}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-4 py-3 text-sm border-b">
+                                                            <span className="font-mono text-gray-600">
+                                                                {customer.email || "-"}
                                                             </span>
                                                         </td>
                                                         <td className="px-4 py-3 text-sm border-b">

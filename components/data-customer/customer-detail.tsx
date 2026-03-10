@@ -51,6 +51,10 @@ import { useState, useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { getCustomerProjectUnits } from '@/services/customer-data'
 import { CopyPlus } from 'lucide-react'
+import { CustomerUpdatePopup } from '@/components/data-customer/customer-update-popup' // Import popup
+import { Customer } from '@/interfaces/customer'
+import { updateProjectDetail } from '@/services/project-data'
+import { Combobox } from './combobox'
 
 interface CustomerDetailProps {
     customer: any
@@ -62,6 +66,7 @@ interface UnitData {
     project_name: string
     unit_code: string
     subdivision: string
+    product_type: string
     floor: string
     source: string
     source_details: string | null
@@ -78,6 +83,32 @@ const CONTRACT_TYPES: Record<string, string> = {
     '': 'Không xác định'
 }
 
+const PRODUCT_TYPES = [
+    "Studio",
+    "1PN",
+    "1PN+",
+    "2PN",
+    "2PN+",
+    "3PN",
+    "3PN+",
+    "4PN",
+    "Duplex",
+    "Penthouse",
+    "Sky Villa",
+    "Shophouse",
+    "Shop Villa",
+    "Boutique",
+    "Land",
+    "Văn Phòng",
+    "House",
+    "Townhouse",
+    "BTSL",
+    "BTĐL",
+    "Villa",
+    "Condotel",
+    "Officetel"
+]
+
 export default function CustomerDetail({ customer }: CustomerDetailProps) {
     const router = useRouter()
     const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
@@ -85,6 +116,12 @@ export default function CustomerDetail({ customer }: CustomerDetailProps) {
     const [projectUnits, setProjectUnits] = useState<Record<string, UnitData[]>>({})
     const [loadingUnits, setLoadingUnits] = useState<Record<string, boolean>>({})
     const [searchTerms, setSearchTerms] = useState<Record<string, string>>({})
+
+    const [editingUnit, setEditingUnit] = useState<any>(null)
+    const [formData, setFormData] = useState<any>({})
+    // State cho popup update
+    const [showUpdatePopup, setShowUpdatePopup] = useState(false)
+    const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
 
     console.log('customer:', customer)
 
@@ -135,17 +172,17 @@ export default function CustomerDetail({ customer }: CustomerDetailProps) {
         setSearchTerms(prev => ({ ...prev, [projectId]: value }))
     }
 
-    const getFilteredUnits = (projectId: string, units: UnitData[]) => {
-        const searchTerm = searchTerms[projectId]?.toLowerCase() || ''
-        if (!searchTerm) return units
+    // const getFilteredUnits = (projectId: string, units: UnitData[]) => {
+    //     const searchTerm = searchTerms[projectId]?.toLowerCase() || ''
+    //     if (!searchTerm) return units
 
-        return units.filter(unit =>
-            unit.unit_code.toLowerCase().includes(searchTerm) ||
-            unit.subdivision.toLowerCase().includes(searchTerm) ||
-            unit.source.toLowerCase().includes(searchTerm) ||
-            (unit.source_details && unit.source_details.toLowerCase().includes(searchTerm))
-        )
-    }
+    //     return units.filter(unit =>
+    //         unit.unit_code.toLowerCase().includes(searchTerm) ||
+    //         unit.subdivision.toLowerCase().includes(searchTerm) ||
+    //         unit.source.toLowerCase().includes(searchTerm) ||
+    //         (unit.source_details && unit.source_details.toLowerCase().includes(searchTerm))
+    //     )
+    // }
 
     const getSourceBadgeColor = (source: string) => {
         const colors = {
@@ -155,6 +192,77 @@ export default function CustomerDetail({ customer }: CustomerDetailProps) {
         }
         return colors[source as keyof typeof colors] || 'bg-gray-100 text-gray-700 border-gray-200'
     }
+
+    // Handler cho nút chỉnh sửa
+    const handleEdit = () => {
+        setSelectedCustomer(customer as Customer)
+        setShowUpdatePopup(true)
+    }
+
+    const handleEditUnit = (unit: any) => {
+        setEditingUnit(unit)
+        setFormData({
+            unit_code: unit.unit_code || "",
+            product_type: unit.product_type || "",
+            subdivision: unit.subdivision || "",
+            floor: unit.floor || "",
+            land_area: unit.land_area || "",
+            usable_area: unit.usable_area || "",
+            door_direction: unit.door_direction || "",
+            view: unit.view || "",
+            contract_price: unit.contract_price || "",
+            day_trading: unit.day_trading || "",
+            source: unit.source || "",
+            source_details: unit.source_details || "",
+            is_active: unit.is_active ?? true
+        })
+    }
+
+    const handleSave = async () => {
+        try {
+
+            await updateProjectDetail(editingUnit.project_detail_id, formData)
+
+            window.location.reload()
+
+        } catch (error) {
+            console.error(error)
+        }
+    }
+
+    // Handler khi update thành công
+    const handleUpdateSuccess = () => {
+        window.location.reload()
+    }
+
+    const [productTypeFilter, setProductTypeFilter] = useState<Record<string, string>>({})
+
+    // Handler cho product type filter
+    const handleProductTypeFilterChange = (projectId: string, value: string) => {
+        setProductTypeFilter(prev => ({ ...prev, [projectId]: value }))
+    }
+
+    // Cập nhật hàm getFilteredUnits để bao gồm filter loại sản phẩm
+    const getFilteredUnits = (projectId: string, units: UnitData[]) => {
+        const searchTerm = searchTerms[projectId]?.toLowerCase() || ''
+        const productType = productTypeFilter[projectId]
+
+        return units.filter(unit => {
+            // Filter by search term
+            const matchesSearch = !searchTerm ||
+                unit.unit_code.toLowerCase().includes(searchTerm) ||
+                unit.subdivision.toLowerCase().includes(searchTerm) ||
+                unit.source.toLowerCase().includes(searchTerm) ||
+                (unit.source_details && unit.source_details.toLowerCase().includes(searchTerm))
+
+            // Filter by product type
+            const matchesProductType = !productType || productType === 'all' || unit.product_type === productType
+
+            return matchesSearch && matchesProductType
+        })
+    }
+
+    // Cập nhật filteredUnits khi render
 
     const tabs = [
         {
@@ -332,8 +440,10 @@ export default function CustomerDetail({ customer }: CustomerDetailProps) {
                                     const isExpanded = expandedProjects.has(projectName)
                                     const units = projectUnits[projectId] || []
                                     const isLoading = loadingUnits[projectId]
-                                    const filteredUnits = useMemo(() => getFilteredUnits(projectId, units), [projectId, units, searchTerms])
-
+                                    const filteredUnits = useMemo(() =>
+                                        getFilteredUnits(projectId, units),
+                                        [projectId, units, searchTerms, productTypeFilter]
+                                    )
                                     return (
                                         <div
                                             key={project.id || index}
@@ -398,9 +508,10 @@ export default function CustomerDetail({ customer }: CustomerDetailProps) {
                                                             </div>
                                                         ) : units.length > 0 ? (
                                                             <div className="p-4 bg-gray-50/50">
-                                                                {/* Search Bar */}
-                                                                <div className="mb-4">
-                                                                    <div className="relative">
+                                                                {/* Filter Bar */}
+                                                                <div className="flex gap-3 mb-4">
+                                                                    {/* Search Bar */}
+                                                                    <div className="relative flex-1">
                                                                         <IconSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                                                                         <Input
                                                                             placeholder="Tìm kiếm theo mã căn, phân khu, nguồn..."
@@ -410,12 +521,29 @@ export default function CustomerDetail({ customer }: CustomerDetailProps) {
                                                                             onClick={(e) => e.stopPropagation()}
                                                                         />
                                                                     </div>
-                                                                    {searchTerms[projectId] && (
-                                                                        <div className="mt-2 text-sm text-gray-500">
-                                                                            Tìm thấy {filteredUnits.length} kết quả cho "{searchTerms[projectId]}"
-                                                                        </div>
-                                                                    )}
+
+                                                                    {/* Product Type Filter Combobox */}
+                                                                    <Combobox
+                                                                        value={productTypeFilter[projectId] || 'all'}
+                                                                        onChange={(value) => handleProductTypeFilterChange(projectId, value)}
+                                                                        title="Loại sản phẩm"
+                                                                        options={[
+                                                                            { value: 'all', label: 'Tất cả loại sản phẩm' },
+                                                                            ...PRODUCT_TYPES.map(type => ({
+                                                                                value: type,
+                                                                                label: type
+                                                                            }))
+                                                                        ]}
+                                                                    />
                                                                 </div>
+
+                                                                {/* Search result info */}
+                                                                {searchTerms[projectId] && (
+                                                                    <div className="mt-2 text-sm text-gray-500">
+                                                                        Tìm thấy {filteredUnits.length} kết quả cho "{searchTerms[projectId]}"
+                                                                    </div>
+                                                                )}
+
 
                                                                 {/* Units Table */}
                                                                 <div className="overflow-x-auto rounded-lg border border-gray-200">
@@ -424,10 +552,14 @@ export default function CustomerDetail({ customer }: CustomerDetailProps) {
                                                                             <TableRow>
                                                                                 <TableHead className="text-xs font-medium text-gray-600 whitespace-nowrap px-4 py-3">Mã căn</TableHead>
                                                                                 <TableHead className="text-xs font-medium text-gray-600 whitespace-nowrap px-4 py-3">Phân khu</TableHead>
+                                                                                <TableHead className="text-xs font-medium text-gray-600 whitespace-nowrap px-4 py-3">Loại sản phẩm</TableHead>
                                                                                 <TableHead className="text-xs font-medium text-gray-600 whitespace-nowrap px-4 py-3">Tầng</TableHead>
                                                                                 <TableHead className="text-xs font-medium text-gray-600 whitespace-nowrap px-4 py-3">Nguồn</TableHead>
                                                                                 <TableHead className="text-xs font-medium text-gray-600 whitespace-nowrap px-4 py-3">Chi tiết nguồn</TableHead>
                                                                                 <TableHead className="text-xs font-medium text-gray-600 whitespace-nowrap px-4 py-3 text-right">Giá hợp đồng</TableHead>
+                                                                                <TableHead className="text-xs font-medium text-gray-600 whitespace-nowrap px-4 py-3 text-center">
+                                                                                    Hành động
+                                                                                </TableHead>
                                                                             </TableRow>
                                                                         </TableHeader>
                                                                         <TableBody>
@@ -443,6 +575,10 @@ export default function CustomerDetail({ customer }: CustomerDetailProps) {
                                                                                         <TableCell className="px-4 py-3 text-gray-600">
                                                                                             {unit.subdivision || '—'}
                                                                                         </TableCell>
+                                                                                        <TableCell className="px-4 py-3 text-gray-700">
+                                                                                            {unit.product_type === 'UNKNOWN'
+                                                                                                ? 'Chưa xác định'
+                                                                                                : unit.product_type || '—'}                                                                                        </TableCell>
                                                                                         <TableCell className="px-4 py-3">
                                                                                             {unit.floor ? (
                                                                                                 <Badge variant="outline" className="rounded-full px-3 py-0.5 text-xs border-gray-300">
@@ -467,6 +603,14 @@ export default function CustomerDetail({ customer }: CustomerDetailProps) {
                                                                                                     </span>
                                                                                                 </div>
                                                                                             ) : '—'}
+                                                                                        </TableCell>
+                                                                                        <TableCell className="text-center">
+                                                                                            <button
+                                                                                                onClick={() => handleEditUnit(unit)}
+                                                                                                className="p-2 border rounded hover:bg-gray-100"
+                                                                                            >
+                                                                                                <IconEdit className="w-4 h-4" />
+                                                                                            </button>
                                                                                         </TableCell>
                                                                                     </TableRow>
                                                                                 ))
@@ -574,7 +718,7 @@ export default function CustomerDetail({ customer }: CustomerDetailProps) {
                                                         <TableHead className="text-xs font-medium text-gray-500 whitespace-nowrap px-4 py-3">Loại hợp đồng</TableHead>
                                                         <TableHead className="text-xs font-medium text-gray-500 whitespace-nowrap px-4 py-3">Mã hợp đồng</TableHead>
                                                         <TableHead className="text-xs font-medium text-gray-500 whitespace-nowrap px-4 py-3">Số căn</TableHead>
-                                                        <TableHead className="text-center text-xs font-medium text-gray-500 whitespace-nowrap px-4 py-3">Sao chép ID</TableHead>
+                                                        <TableHead className="text-center text-xs font-medium text-gray-500 whitespace-nowrap px-4 py-3">Hành động</TableHead>
                                                     </TableRow>
                                                 </TableHeader>
                                                 <TableBody>
@@ -598,15 +742,15 @@ export default function CustomerDetail({ customer }: CustomerDetailProps) {
                                                                     {project.total_units || 0}
                                                                 </Badge>
                                                             </TableCell>
-                                                            <TableCell className="text-center px-4 py-3">
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    size="icon"
-                                                                    onClick={(e) => handleViewDetails(project.project_id, e)}
-                                                                    className="rounded-full hover:bg-gray-200 h-8 w-8"
+
+                                                            <TableCell className="text-center">
+                                                                <button
+                                                                    onClick={() => handleEditUnit(project)}
+                                                                    className="p-2 border rounded hover:bg-gray-100"
                                                                 >
-                                                                    <CopyPlus className="h-4 w-4 text-gray-500" />
-                                                                </Button>
+                                                                    Asfasf
+                                                                    <IconEdit className="w-4 h-4" />
+                                                                </button>
                                                             </TableCell>
                                                         </TableRow>
                                                     ))}
@@ -624,118 +768,367 @@ export default function CustomerDetail({ customer }: CustomerDetailProps) {
     ]
 
     return (
-        <div className="min-h-screen bg-[#F8FAFC]">
-            {/* Header */}
-            <div className="bg-white/80 backdrop-blur-xl border-b border-gray-200/80 sticky top-0 z-50">
-                <div className="w-full px-6 lg:px-8 py-4">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => router.push('/data-customer')}
-                                className="rounded-full hover:bg-gray-100 w-10 h-10"
-                            >
-                                <IconArrowLeft className="h-5 w-5" />
-                            </Button>
-                            <div>
-                                <h1 className="text-xl font-semibold text-gray-900">
-                                    {customer.customer_name || 'Khách hàng'}
-                                </h1>
-                                <p className="text-sm text-gray-500">
-                                    ID: {customer.id?.slice(0, 8)}...
-                                </p>
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <Button variant="ghost" size="icon" className="rounded-full hover:bg-gray-100 w-10 h-10">
-                                <IconShare className="h-5 w-5 text-gray-600" />
-                            </Button>
-                            <Button variant="ghost" size="icon" className="rounded-full hover:bg-gray-100 w-10 h-10">
-                                <IconPrinter className="h-5 w-5 text-gray-600" />
-                            </Button>
-                            <Button className="rounded-full bg-black hover:bg-gray-800 text-white px-5 h-10">
-                                <IconEdit className="h-4 w-4 mr-2" />
-                                Chỉnh sửa
-                            </Button>
-                        </div>
-                    </div>
-                </div>
-            </div>
+        <>
 
-            {/* Main Content */}
-            <div className="w-full px-6 lg:px-8 py-8">
-                {/* Profile Card */}
-                <div className="bg-white rounded-2xl border border-gray-200/80 p-6 mb-8 w-full shadow-sm">
-                    <div className="flex items-start gap-6">
-                        <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-gray-900 to-gray-700 flex items-center justify-center text-white text-3xl font-semibold shadow-lg shrink-0">
-                            {customer.customer_name?.charAt(0).toUpperCase() || 'K'}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <div className="flex items-start justify-between gap-4">
-                                <div className="min-w-0">
-                                    <h2 className="text-2xl font-semibold text-gray-900 truncate">
-                                        {customer.customer_name || 'Chưa có tên'}
-                                    </h2>
-                                    <div className="flex items-center gap-4 mt-2 flex-wrap">
-                                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                                            <IconPhone className="h-4 w-4" />
-                                            <span>{getDisplayValue(customer.phone_number)}</span>
-                                        </div>
-                                        <span className="text-gray-300 hidden sm:inline">•</span>
-                                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                                            <IconMail className="h-4 w-4" />
-                                            <span>{getDisplayValue(customer.email)}</span>
-                                        </div>
-                                        {customer.cccd && (
-                                            <>
-                                                <span className="text-gray-300 hidden sm:inline">•</span>
-                                                <div className="flex items-center gap-2 text-sm text-gray-600">
-                                                    <IconId className="h-4 w-4" />
-                                                    <span>{getDisplayValue(customer.cccd)}</span>
-                                                </div>
-                                            </>
-                                        )}
+            <div className="min-h-screen bg-[#F8FAFC]">
+                {editingUnit && (
+                    <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4">
+                        <div className="bg-white rounded-xl w-full max-w-4xl max-h-[90vh] overflow-hidden shadow-lg">
+
+                            {/* Header */}
+                            <div className="px-6 py-4 border-b border-gray-200">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <h2 className="text-base font-medium text-gray-700">
+                                            Cập nhật thông tin
+                                        </h2>
+                                        <p className="text-xs text-gray-400 mt-0.5">
+                                            Mã căn: <span className="text-gray-600">{editingUnit.unit_code}</span>
+                                        </p>
                                     </div>
+                                    <button
+                                        onClick={() => setEditingUnit(null)}
+                                        className="text-gray-400 hover:text-gray-600"
+                                    >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                    </button>
                                 </div>
-                                <Badge variant="outline" className="px-4 py-1.5 rounded-full text-sm border-gray-300 bg-gray-50">
-                                    {customer.projects?.new_sales?.length || 0} dự án
-                                </Badge>
+                            </div>
+
+                            {/* Body */}
+                            <div className="p-5 overflow-y-auto max-h-[calc(90vh-120px)]">
+                                <div className="grid grid-cols-2 gap-4">
+
+                                    {/* Cột 1 */}
+                                    <div className="space-y-3">
+                                        <div>
+                                            <label className="text-xs text-gray-500 block mb-1">Mã căn</label>
+                                            <input
+                                                type="text"
+                                                value={formData.unit_code}
+                                                onChange={(e) => setFormData({ ...formData, unit_code: e.target.value })}
+                                                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-gray-400 focus:outline-none"
+                                                placeholder="Nhập mã căn"
+                                            />
+                                        </div>
+
+                                        {/* Loại sản phẩm - ĐÃ SỬA THÀNH SELECT */}
+                                        <div>
+                                            <label className="text-xs text-gray-500 block mb-1">Loại sản phẩm</label>
+                                            <select
+                                                value={formData.product_type}
+                                                onChange={(e) => setFormData({ ...formData, product_type: e.target.value })}
+                                                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-gray-400 focus:outline-none bg-white"
+                                            >
+                                                <option value="">Chọn loại sản phẩm</option>
+                                                {PRODUCT_TYPES.map((type) => (
+                                                    <option key={type} value={type}>{type}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+
+                                        <div>
+                                            <label className="text-xs text-gray-500 block mb-1">Phân khu</label>
+                                            <input
+                                                type="text"
+                                                value={formData.subdivision}
+                                                onChange={(e) => setFormData({ ...formData, subdivision: e.target.value })}
+                                                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-gray-400 focus:outline-none"
+                                                placeholder="Nhập phân khu"
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="text-xs text-gray-500 block mb-1">Tầng</label>
+                                            <input
+                                                type="number"
+                                                value={formData.floor}
+                                                onChange={(e) => setFormData({ ...formData, floor: e.target.value })}
+                                                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-gray-400 focus:outline-none"
+                                                placeholder="Nhập tầng"
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="text-xs text-gray-500 block mb-1">Diện tích đất (m²)</label>
+                                            <input
+                                                type="number"
+                                                step="0.01"
+                                                value={formData.land_area}
+                                                onChange={(e) => setFormData({ ...formData, land_area: e.target.value })}
+                                                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-gray-400 focus:outline-none"
+                                                placeholder="Nhập diện tích đất"
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="text-xs text-gray-500 block mb-1">Diện tích sử dụng (m²)</label>
+                                            <input
+                                                type="number"
+                                                step="0.01"
+                                                value={formData.usable_area}
+                                                onChange={(e) => setFormData({ ...formData, usable_area: e.target.value })}
+                                                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-gray-400 focus:outline-none"
+                                                placeholder="Nhập diện tích sử dụng"
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="text-xs text-gray-500 block mb-1">Hướng cửa</label>
+                                            <select
+                                                value={formData.door_direction}
+                                                onChange={(e) => setFormData({ ...formData, door_direction: e.target.value })}
+                                                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-gray-400 focus:outline-none bg-white"
+                                            >
+                                                <option value="">Chọn hướng</option>
+                                                <option value="Đông">Đông</option>
+                                                <option value="Tây">Tây</option>
+                                                <option value="Nam">Nam</option>
+                                                <option value="Bắc">Bắc</option>
+                                                <option value="Đông Bắc">Đông Bắc</option>
+                                                <option value="Đông Nam">Đông Nam</option>
+                                                <option value="Tây Bắc">Tây Bắc</option>
+                                                <option value="Tây Nam">Tây Nam</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    {/* Cột 2 */}
+                                    <div className="space-y-3">
+                                        <div>
+                                            <label className="text-xs text-gray-500 block mb-1">View</label>
+                                            <select
+                                                value={formData.view}
+                                                onChange={(e) => setFormData({ ...formData, view: e.target.value })}
+                                                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-gray-400 focus:outline-none bg-white"
+                                            >
+                                                <option value="">Chọn view</option>
+                                                <option value="Biển">Biển</option>
+                                                <option value="Thành phố">Thành phố</option>
+                                                <option value="Hồ bơi">Hồ bơi</option>
+                                                <option value="Công viên">Công viên</option>
+                                                <option value="Nội khu">Nội khu</option>
+                                            </select>
+                                        </div>
+
+                                        <div>
+                                            <label className="text-xs text-gray-500 block mb-1">Giá hợp đồng (VNĐ)</label>
+                                            <input
+                                                type="number"
+                                                value={formData.contract_price}
+                                                onChange={(e) => setFormData({ ...formData, contract_price: e.target.value })}
+                                                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-gray-400 focus:outline-none"
+                                                placeholder="Nhập giá hợp đồng"
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="text-xs text-gray-500 block mb-1">Ngày giao dịch</label>
+                                            <input
+                                                type="date"
+                                                value={formData.day_trading}
+                                                onChange={(e) => setFormData({ ...formData, day_trading: e.target.value })}
+                                                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-gray-400 focus:outline-none"
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="text-xs text-gray-500 block mb-1">Nguồn</label>
+                                            <select
+                                                value={formData.source}
+                                                onChange={(e) => setFormData({ ...formData, source: e.target.value })}
+                                                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-gray-400 focus:outline-none bg-white"
+                                            >
+                                                <option value="">Chọn nguồn</option>
+                                                <option value="BDS">BDS</option>
+                                                <option value="GUI_TIET_KIEM">Gửi tiết kiệm</option>
+                                                <option value="XE_HOI">Xe hơi</option>
+                                                <option value="CHUNG_KHOAN">Chứng khoán</option>
+                                                <option value="VANG">Vàng</option>
+                                                <option value="TRUONG_QUOC_TE">Trường quốc tế</option>
+                                                <option value="BAC_SI">Bác sĩ</option>
+                                                <option value="QUAN_CHUC">Quan chức</option>
+                                                <option value="DINH_CU">Định cư</option>
+                                                <option value="TMĐT">TMĐT</option>
+                                                <option value="CEO">CEO</option>
+                                                <option value="BAO_HIEM">Bảo hiểm</option>
+                                                <option value="GOLF">Golf</option>
+                                                <option value="KS_5_SAO">KS 5 sao</option>
+                                                <option value="HIEP_HOI">Hiệp hội</option>
+                                            </select>
+                                        </div>
+
+                                        <div>
+                                            <label className="text-xs text-gray-500 block mb-1">Chi tiết nguồn</label>
+                                            <input
+                                                type="text"
+                                                value={formData.source_details}
+                                                onChange={(e) => setFormData({ ...formData, source_details: e.target.value })}
+                                                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-gray-400 focus:outline-none"
+                                                placeholder="Nhập chi tiết nguồn"
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="text-xs text-gray-500 block mb-1">Trạng thái</label>
+                                            <select
+                                                value={formData.is_active}
+                                                onChange={(e) => setFormData({ ...formData, is_active: e.target.value === "true" })}
+                                                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-gray-400 focus:outline-none bg-white"
+                                            >
+                                                <option value="true">Hoạt động</option>
+                                                <option value="false">Không hoạt động</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                </div>
+                            </div>
+
+                            {/* Footer */}
+                            <div className="px-5 py-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-2">
+                                <button
+                                    onClick={() => setEditingUnit(null)}
+                                    className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                                >
+                                    Hủy
+                                </button>
+                                <button
+                                    onClick={handleSave}
+                                    className="px-4 py-2 text-sm bg-gray-800 text-white hover:bg-gray-700 rounded-lg transition-colors"
+                                >
+                                    Cập nhật
+                                </button>
+                            </div>
+
+                        </div>
+                    </div>
+                )}
+                {/* Header */}
+                <div className="bg-white/80 backdrop-blur-xl border-b border-gray-200/80   z-50">
+                    <div className="w-full px-6 lg:px-8 py-4">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => router.push('/data-customer')}
+                                    className="rounded-full hover:bg-gray-100 w-10 h-10"
+                                >
+                                    <IconArrowLeft className="h-5 w-5" />
+                                </Button>
+                                <div>
+                                    <h1 className="text-xl font-semibold text-gray-900">
+                                        {customer.customer_name || 'Khách hàng'}
+                                    </h1>
+                                    <p className="text-sm text-gray-500">
+                                        ID: {customer.id?.slice(0, 8)}...
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <Button variant="ghost" size="icon" className="rounded-full hover:bg-gray-100 w-10 h-10">
+                                    <IconShare className="h-5 w-5 text-gray-600" />
+                                </Button>
+                                <Button variant="ghost" size="icon" className="rounded-full hover:bg-gray-100 w-10 h-10">
+                                    <IconPrinter className="h-5 w-5 text-gray-600" />
+                                </Button>
+                                <Button
+                                    onClick={handleEdit}
+                                    className="rounded-full bg-black hover:bg-gray-800 text-white px-5 h-10"
+                                >
+                                    <IconEdit className="h-4 w-4 mr-2" />
+                                    Chỉnh sửa
+                                </Button>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                {/* Tabs */}
-                <Tabs defaultValue="personal" className="space-y-6">
-                    <TabsList className="bg-transparent border-b border-gray-200/80 rounded-none h-12 p-0 w-full justify-start gap-8">
-                        {tabs.map((tab) => (
-                            <TabsTrigger
-                                key={tab.value}
-                                value={tab.value}
-                                className="rounded-none px-0 pb-3 data-[state=active]:border-b-2 data-[state=active]:border-black data-[state=active]:shadow-none bg-transparent h-auto text-sm font-medium text-gray-600 data-[state=active]:text-black"
-                            >
-                                <tab.icon className="h-4 w-4 mr-2" />
-                                {tab.label}
-                            </TabsTrigger>
-                        ))}
-                    </TabsList>
+                {/* Main Content */}
+                <div className="w-full px-6 lg:px-8 py-8">
+                    {/* Profile Card */}
+                    <div className="bg-white rounded-2xl border border-gray-200/80 p-6 mb-8 w-full shadow-sm">
+                        <div className="flex items-start gap-6">
+                            <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-gray-900 to-gray-700 flex items-center justify-center text-white text-3xl font-semibold shadow-lg shrink-0">
+                                {customer.customer_name?.charAt(0).toUpperCase() || 'K'}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <div className="flex items-start justify-between gap-4">
+                                    <div className="min-w-0">
+                                        <h2 className="text-2xl font-semibold text-gray-900 truncate">
+                                            {customer.customer_name || 'Chưa có tên'}
+                                        </h2>
+                                        <div className="flex items-center gap-4 mt-2 flex-wrap">
+                                            <div className="flex items-center gap-2 text-sm text-gray-600">
+                                                <IconPhone className="h-4 w-4" />
+                                                <span>{getDisplayValue(customer.phone_number)}</span>
+                                            </div>
+                                            <span className="text-gray-300 hidden sm:inline">•</span>
+                                            <div className="flex items-center gap-2 text-sm text-gray-600">
+                                                <IconMail className="h-4 w-4" />
+                                                <span>{getDisplayValue(customer.email)}</span>
+                                            </div>
+                                            {customer.cccd && (
+                                                <>
+                                                    <span className="text-gray-300 hidden sm:inline">•</span>
+                                                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                                                        <IconId className="h-4 w-4" />
+                                                        <span>{getDisplayValue(customer.cccd)}</span>
+                                                    </div>
+                                                </>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <Badge variant="outline" className="px-4 py-1.5 rounded-full text-sm border-gray-300 bg-gray-50">
+                                        {customer.projects?.new_sales?.length || 0} dự án
+                                    </Badge>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
-                    {tabs.map((tab) => (
-                        <TabsContent key={tab.value} value={tab.value}>
-                            {tab.content}
-                        </TabsContent>
-                    ))}
-                </Tabs>
+                    {/* Tabs */}
+                    <Tabs defaultValue="personal" className="space-y-6">
+                        <TabsList className="bg-transparent border-b border-gray-200/80 rounded-none h-12 p-0 w-full justify-start gap-8">
+                            {tabs.map((tab) => (
+                                <TabsTrigger
+                                    key={tab.value}
+                                    value={tab.value}
+                                    className="rounded-none px-0 pb-3 data-[state=active]:border-b-2 data-[state=active]:border-black data-[state=active]:shadow-none bg-transparent h-auto text-sm font-medium text-gray-600 data-[state=active]:text-black"
+                                >
+                                    <tab.icon className="h-4 w-4 mr-2" />
+                                    {tab.label}
+                                </TabsTrigger>
+                            ))}
+                        </TabsList>
+
+                        {tabs.map((tab) => (
+                            <TabsContent key={tab.value} value={tab.value}>
+                                {tab.content}
+                            </TabsContent>
+                        ))}
+                    </Tabs>
+                </div>
+
+                {/* Debug Panel */}
+                {selectedProjectId && (
+                    <div className="fixed bottom-4 right-4 bg-gray-900 text-white px-4 py-2 rounded-xl text-sm shadow-lg z-50">
+                        Project ID: {selectedProjectId.slice(0, 8)}...
+                    </div>
+                )}
             </div>
 
-            {/* Debug Panel */}
-            {selectedProjectId && (
-                <div className="fixed bottom-4 right-4 bg-gray-900 text-white px-4 py-2 rounded-xl text-sm shadow-lg z-50">
-                    Project ID: {selectedProjectId.slice(0, 8)}...
-                </div>
-            )}
-        </div>
+            {/* Customer Update Popup */}
+            <CustomerUpdatePopup
+                open={showUpdatePopup}
+                onOpenChange={setShowUpdatePopup}
+                customer={selectedCustomer}
+                onSuccess={handleUpdateSuccess}
+            />
+        </>
     )
 }
 
@@ -765,3 +1158,4 @@ function InfoItem({ label, value, icon, fullWidth = false, getDisplayValue }: In
         </div>
     )
 }
+

@@ -55,6 +55,7 @@
     "cmdk": "^1.1.1",
     "date-fns": "^4.1.0",
     "emoji-picker-react": "^4.16.1",
+    "file-saver": "^2.0.5",
     "framer-motion": "^12.35.0",
     "lodash.debounce": "^4.0.8",
     "lucide-react": "^0.561.0",
@@ -74,6 +75,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/file-saver": "^2.0.7",
     "@types/lodash.debounce": "^4.0.9",
     "@types/node": "^20",
     "@types/react": "^19",

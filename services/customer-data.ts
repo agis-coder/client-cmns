@@ -1,22 +1,14 @@
 import { CustomerApiResponse } from "@/interfaces/api";
-import { Customer, ImportResult, ImportType, ProjectsBySourceResponse, SubdivisionsBySourceResponse } from "@/interfaces/customer";
+import { Customer, CustomerUpdateData, ImportResult, ImportType, ProjectsBySourceResponse, SubdivisionsBySourceResponse } from "@/interfaces/customer";
 import { SendBulkMailPayload } from "@/interfaces/mail";
 import { api } from "@/lib/axios";
 
-export async function fetchAllCustomers(
-    page: number,
-    searchTerm?: string,
-    source?: string,
-    projectId?: string,
-    country?: 'vn' | 'nn',
-    birthday?: 'today' | 'tomorrow',
-    sortByPurchase?: 'most' | 'least'
-): Promise<CustomerApiResponse> {
+export async function fetchAllCustomers(page: number, searchTerm?: string, source?: string, projectId?: string, country?: 'vn' | 'nn', birthday?: 'today' | 'tomorrow', sortByPurchase?: 'most' | 'least'): Promise<CustomerApiResponse> {
 
     const response = await api.get<CustomerApiResponse>('/customers', {
         params: {
             page,
-            pageSize: 30,
+            pageSize: 500,
             search: searchTerm || undefined,
             source: source || undefined,
             projectId: projectId || undefined,
@@ -25,7 +17,7 @@ export async function fetchAllCustomers(
             sortByPurchase: sortByPurchase || undefined,
         },
     })
-
+    console.log('response.data:', response.data)
     return response.data
 }
 
@@ -36,6 +28,16 @@ export async function fetchCustomerById(id: string): Promise<Customer | null> {
     } catch (error) {
         console.error("Error fetching customer by ID:", error);
         return null;
+    }
+}
+
+export async function updateCustomer(id: string, data: CustomerUpdateData): Promise<Customer | null> {
+    try {
+        const response = await api.patch<Customer>(`/customers/${id}`, data);
+        return response.data;
+    } catch (error) {
+        console.error("Error updating customer:", error);
+        throw error; // Ném lỗi để xử lý ở component
     }
 }
 

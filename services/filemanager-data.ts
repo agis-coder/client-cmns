@@ -41,3 +41,7 @@ export const getImportFiles = async (
 
     return res.data;
 };
+
+export const deleteImportFile = async (id: string): Promise<void> => {
+    await api.delete(`/imports/${id}`);
+};

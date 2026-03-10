@@ -1,3 +1,4 @@
+// components/data-customer/data-table.tsx
 "use client"
 import * as React from "react"
 import { flexRender, getCoreRowModel, useReactTable } from "@tanstack/react-table"
@@ -6,13 +7,16 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { IconSearch, IconX, IconChevronLeft, IconChevronRight, IconLoader2 } from "@tabler/icons-react"
 import { useDebounce } from "@/hooks/use-debounce"
-import { DataTableProps } from "@/interfaces/customer"
+import { DataTableProps, ExtendedCustomer } from "@/interfaces/customer"
 import { getSourceLabel } from "@/lib/utils"
-import { columns } from "./table"
+import { createColumns } from "./table"
 import { fetchAllCustomers, fetchProjectsBySource, fetchSubdivisionsBySource } from "@/services/customer-data"
 import { Combobox } from "./combobox"
 import { ProjectCategory } from "./project-category"
 import { useRouter } from "next/navigation"
+import { CustomerUpdatePopup } from "./customer-update-popup"
+import * as XLSX from "xlsx"
+import { saveAs } from "file-saver"
 
 const getProjectSources = (projects: any): string[] => {
   if (!Array.isArray(projects)) return []
@@ -28,6 +32,8 @@ export function DataTable({ data }: DataTableProps) {
 
   const router = useRouter()
   const [loading, setLoading] = React.useState(false)
+  const [selectedCustomer, setSelectedCustomer] = React.useState<ExtendedCustomer | null>(null)
+  const [showUpdatePopup, setShowUpdatePopup] = React.useState(false)
 
   const [tableData, setTableData] = React.useState<any[]>((data as any).data ?? [])
   const [search, setSearch] = React.useState("")
@@ -101,7 +107,7 @@ export function DataTable({ data }: DataTableProps) {
         setLoading(false)
       })
 
-  }, [currentPage, debouncedSearch, projectFilter, quickFilter])
+  }, [currentPage, debouncedSearch, investorFilter, projectFilter, quickFilter]) // Thêm investorFilter và projectFilter vào dependencies
 
   const paginatedData = React.useMemo(() =>
     tableData.map((c: any) => ({
@@ -112,175 +118,256 @@ export function DataTable({ data }: DataTableProps) {
     })), [tableData]
   )
 
-  const table = useReactTable({ data: paginatedData, columns, getCoreRowModel: getCoreRowModel(), enableRowSelection: true, onRowSelectionChange: setRowSelection, state: { rowSelection }, getRowId: (row: any) => String(row.id) })
+  const handleEdit = (customer: ExtendedCustomer) => {
+    setSelectedCustomer(customer)
+    setShowUpdatePopup(true)
+  }
+
+  const handleUpdateSuccess = () => {
+    // Refresh data after update
+    setLoading(true)
+    fetchAllCustomers(
+      currentPage,
+      debouncedSearch || undefined,
+      investorFilter !== "all" ? investorFilter : undefined,
+      projectFilter !== "all" ? projectFilter : undefined,
+      countryFilter,
+      birthdayFilter,
+      purchaseSort
+    )
+      .then((res) => {
+        setTableData(res.data ?? [])
+        setTotalPages(res.totalPages ?? 1)
+      })
+      .finally(() => {
+        setLoading(false)
+      })
+  }
+
+  // Tạo columns với handleEdit
+  const columns = React.useMemo(
+    () => createColumns(handleEdit),
+    [handleEdit]
+  )
+
+  const table = useReactTable({
+    data: paginatedData,
+    columns, // Sử dụng columns đã tạo
+    getCoreRowModel: getCoreRowModel(),
+    enableRowSelection: true,
+    onRowSelectionChange: setRowSelection,
+    state: { rowSelection },
+    getRowId: (row: any) => String(row.id)
+  })
 
   const selectedEmails = React.useMemo(() =>
     Array.from(new Set(table.getSelectedRowModel().rows.map((r) => r.original.email).filter((e) => e && e !== "Chưa có"))
     ), [table.getSelectedRowModel().rows]
   )
 
-  console.log('projectFilter:', projectFilter)
+  const exportToExcel = () => {
+
+    const exportData = paginatedData.map((c) => ({
+      "Họ và tên": c.customer_name || "",
+      "Email": c.email || "",
+      "Số điện thoại": (c.phone_number || "").replace(/\|/g, "-"),
+      "Quốc tịch": c.nationality === "vn" ? "Việt Nam" : c.nationality === "nn" ? "Nước ngoài" : "",
+      "Địa chỉ": c.address || "",
+      "Số căn đã mua": c.project_count || 0,
+    }))
+
+    const worksheet = XLSX.utils.json_to_sheet(exportData)
+
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Customers")
+
+    const excelBuffer = XLSX.write(workbook, {
+      bookType: "xlsx",
+      type: "array",
+    })
+
+    const blob = new Blob([excelBuffer], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    })
+
+    saveAs(blob, `customers_${Date.now()}.xlsx`)
+  }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap gap-2">
-        <div className="relative flex-1">
-          <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Tìm theo tên, SĐT, email..."
-            className="pl-9 pr-9 w-full sm:w-full h-12 border border-gray-200 dark:border-gray-800 outline-none focus:outline-none focus:ring-0 focus:border-gray-400 dark:focus:border-gray-600"
+    <>
+      <div className="space-y-4">
+        <div className="flex flex-wrap gap-2">
+          <div className="relative flex-1">
+            <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Tìm theo tên, SĐT, email..."
+              className="pl-9 pr-9 w-full sm:w-full h-12 border border-gray-200 dark:border-gray-800 outline-none focus:outline-none focus:ring-0 focus:border-gray-400 dark:focus:border-gray-600"
+            />
+            {search && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="absolute right-1 top-1/2 -translate-y-1/2"
+                onClick={() => setSearch("")}
+              >
+                <IconX className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+
+          <Combobox
+            value={quickFilter}
+            onChange={(v) => setQuickFilter(v as any)}
+            title="Bộ lọc tổng hợp"
+            options={[
+              { value: "all", label: "Tất cả khách hàng" },
+              { value: "birthday_today", label: "Sinh nhật hôm nay" },
+              { value: "birthday_tomorrow", label: "Sinh nhật ngày mai" },
+              { value: "purchase_most", label: "Khách hàng mua nhiều nhất" },
+              { value: "purchase_least", label: "Khách hàng mua ít nhất" },
+              { value: "country_vn", label: "Khách người Việt Nam" },
+              { value: "country_nn", label: "Khách người Nước ngoài" },
+            ]}
           />
-          {search && (
+
+          <Combobox
+            value={sourceFilter}
+            onChange={(v) => setSourceFilter(v as "all" | ProjectCategory)}
+            title="Danh mục"
+            options={Object.values(ProjectCategory).map((c) => ({
+              value: c,
+              label: getSourceLabel(c),
+            }))}
+          />
+
+          <Combobox
+            value={investorFilter}
+            onChange={setInvestorFilter}
+            title="Chủ đầu tư"
+            disabled={sourceFilter === "all"}
+            options={investorOptions.map((i) => ({
+              value: i,
+              label: i,
+            })) ?? []}
+          />
+
+          <Combobox
+            value={projectFilter}
+            onChange={(v: string) => setProjectFilter(v)}
+            title="Dự án"
+            disabled={investorFilter === "all" || projectOptions.length === 0}
+            options={projectOptions.map((p) => ({
+              value: String(p.id),
+              label: p.project_name,
+            }))}
+          />
+
+          {selectedEmails.length > 0 && (
             <Button
-              variant="ghost"
-              size="sm"
-              className="absolute right-1 top-1/2 -translate-y-1/2"
-              onClick={() => setSearch("")}
+              onClick={() => {
+                sessionStorage.setItem("mail_recipients", JSON.stringify(selectedEmails))
+                router.push("/sendmail")
+              }}
             >
-              <IconX className="h-4 w-4" />
+              Gửi mail ({selectedEmails.length})
             </Button>
           )}
+          <Button
+            variant="outline"
+            onClick={exportToExcel}
+          >
+            Xuất Excel
+          </Button>
+
         </div>
 
-        <Combobox
-          value={quickFilter}
-          onChange={(v) => setQuickFilter(v as any)}
-          title="Bộ lọc tổng hợp"
-          options={[
-            { value: "all", label: "Tất cả khách hàng" },
-            { value: "birthday_today", label: "Sinh nhật hôm nay" },
-            { value: "birthday_tomorrow", label: "Sinh nhật ngày mai" },
-            { value: "purchase_most", label: "Khách hàng mua nhiều nhất" },
-            { value: "purchase_least", label: "Khách hàng mua ít nhất" },
-            { value: "country_vn", label: "Khách người Việt Nam" },
-            { value: "country_nn", label: "Khách người Nước ngoài" },
-          ]}
-        />
+        <div className="rounded-md border">
 
-        <Combobox
-          value={sourceFilter}
-          onChange={(v) => setSourceFilter(v as "all" | ProjectCategory)}
-          title="Danh mục"
-          options={Object.values(ProjectCategory).map((c) => ({
-            value: c,
-            label: getSourceLabel(c),
-          }))}
-        />
+          <Table>
 
-        <Combobox
-          value={investorFilter}
-          onChange={setInvestorFilter}
-          title="Chủ đầu tư"
-          disabled={sourceFilter === "all"}
-          options={investorOptions.map((i) => ({
-            value: i,
-            label: i,
-          })) ?? []}
-        />
-
-        <Combobox
-          value={projectFilter}
-          onChange={(v: string) => setProjectFilter(v)}
-          title="Dự án"
-          disabled={investorFilter === "all" || projectOptions.length === 0}
-          options={projectOptions.map((p) => ({
-            value: String(p.id),
-            label: p.project_name,
-          }))}
-        />
-
-        {selectedEmails.length > 0 && (
-          <Button
-            onClick={() => {
-              sessionStorage.setItem("mail_recipients", JSON.stringify(selectedEmails))
-              router.push("/sendmail")
-            }}
-          >
-            Gửi mail ({selectedEmails.length})
-          </Button>
-        )}
-
-      </div>
-
-      <div className="rounded-md border">
-
-        <Table>
-
-          <TableHeader>
-            {table.getHeaderGroups().map((hg) => (
-              <TableRow key={hg.id}>
-                {hg.headers.map((h) => (
-                  <TableHead key={h.id}>
-                    {flexRender(h.column.columnDef.header, h.getContext())}
-                  </TableHead>
-                ))}
-              </TableRow>
-            ))}
-          </TableHeader>
-
-          <TableBody>
-
-            {loading ? (
-              <TableRow>
-                <TableCell colSpan={columns.length} className="text-center py-10">
-                  <div className="flex justify-center items-center gap-2">
-                    <IconLoader2 className="animate-spin h-4 w-4" />
-                    Đang tải dữ liệu...
-                  </div>
-                </TableCell>
-              </TableRow>
-            ) : table.getRowModel().rows.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={columns.length} className="text-center py-10 text-muted-foreground">
-                  Không tìm thấy khách hàng
-                </TableCell>
-              </TableRow>
-            ) : (
-              table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id}>
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </TableCell>
+            <TableHeader>
+              {table.getHeaderGroups().map((hg) => (
+                <TableRow key={hg.id}>
+                  {hg.headers.map((h) => (
+                    <TableHead key={h.id}>
+                      {flexRender(h.column.columnDef.header, h.getContext())}
+                    </TableHead>
                   ))}
                 </TableRow>
-              ))
-            )}
+              ))}
+            </TableHeader>
 
-          </TableBody>
+            <TableBody>
 
-        </Table>
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={columns.length} className="text-center py-10">
+                    <div className="flex justify-center items-center gap-2">
+                      <IconLoader2 className="animate-spin h-4 w-4" />
+                      Đang tải dữ liệu...
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : table.getRowModel().rows.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={columns.length} className="text-center py-10 text-muted-foreground">
+                    Không tìm thấy khách hàng
+                  </TableCell>
+                </TableRow>
+              ) : (
+                table.getRowModel().rows.map((row) => (
+                  <TableRow key={row.id}>
+                    {row.getVisibleCells().map((cell) => (
+                      <TableCell key={cell.id}>
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              )}
+
+            </TableBody>
+
+          </Table>
+
+        </div>
+
+        <div className="flex justify-end items-center gap-2">
+
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={currentPage <= 1}
+            onClick={() => setCurrentPage((p) => p - 1)}
+          >
+            <IconChevronLeft />
+          </Button>
+
+          <span>
+            {currentPage} / {totalPages || 1}
+          </span>
+
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={currentPage >= totalPages}
+            onClick={() => setCurrentPage((p) => p + 1)}
+          >
+            <IconChevronRight />
+          </Button>
+
+        </div>
 
       </div>
 
-      <div className="flex justify-end items-center gap-2">
-
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={currentPage <= 1}
-          onClick={() => setCurrentPage((p) => p - 1)}
-        >
-          <IconChevronLeft />
-        </Button>
-
-        <span>
-          {currentPage} / {totalPages || 1}
-        </span>
-
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={currentPage >= totalPages}
-          onClick={() => setCurrentPage((p) => p + 1)}
-        >
-          <IconChevronRight />
-        </Button>
-
-      </div>
-
-    </div>
+      <CustomerUpdatePopup
+        open={showUpdatePopup}
+        onOpenChange={setShowUpdatePopup}
+        customer={selectedCustomer}
+        onSuccess={handleUpdateSuccess}
+      />
+    </>
   )
 }

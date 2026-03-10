@@ -1,4 +1,5 @@
 export interface Customer {
+    gender: string
     id: string
     // Thông tin dự án
     project_name: string
@@ -138,4 +139,27 @@ export interface ProjectsBySourceResponse {
 export interface SubdivisionsBySourceResponse {
     source: string
     subdivisions: string[]
+}
+
+export interface ExtendedCustomer extends Customer {
+    // Thêm các field mở rộng nếu cần
+    projects?: any[]
+}
+
+// interfaces/customer.ts
+export interface CustomerUpdateData {
+    customer_name?: string
+    phone_number?: string
+    date_of_birth?: string | null
+    cccd?: string | null
+    email?: string | null
+    gender?: string | null
+    address?: string | null
+    permanent_address?: string | null
+    living_area?: string | null
+    the_product_type?: string | null
+    nationality?: string | null
+    marital_status?: string | null
+    business_field?: string | null
+    isVip?: boolean | null
 }

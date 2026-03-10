@@ -1,5 +1,6 @@
+// components/data-customer/columns.tsx
 import { ExtendedCustomer } from "@/interfaces/customer"
-import { IconBuilding, IconEye, IconHome, IconMail, IconPhone, IconUser, } from "@tabler/icons-react"
+import { IconBuilding, IconEdit, IconEye, IconHome, IconMail, IconPhone, IconUser, } from "@tabler/icons-react"
 import { ColumnDef } from "@tanstack/react-table"
 import { Badge } from "../ui/badge"
 import { useRouter } from "next/navigation"
@@ -26,7 +27,10 @@ const getDisplayValue = (value: any): string => {
     return String(value)
 }
 
-export const columns: ColumnDef<ExtendedCustomer, any>[] = [
+
+
+// Hàm tạo columns với tham số onEdit
+export const createColumns = (onEdit?: (customer: ExtendedCustomer) => void): ColumnDef<ExtendedCustomer, any>[] => [
     {
         id: "select",
         header: ({ table }) => (
@@ -242,22 +246,50 @@ export const columns: ColumnDef<ExtendedCustomer, any>[] = [
         id: "actions",
         header: () => (
             <div className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider text-center">
-                Xem
+                Thao tác
             </div>
         ),
         cell: ({ row }) => {
             const router = useRouter()
+
             return (
-                <div className="flex items-center justify-center py-2">
-                    <button
-                        onClick={() => router.push(`/data-customer/${row.original.id}`)}
-                        className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors duration-150"
-                    >
-                        <IconEye className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-                    </button>
+                <div className="flex items-center justify-center gap-1 py-2">
+                    <TooltipProvider>
+                        {/* View button */}
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <button
+                                    onClick={() => router.push(`/data-customer/${row.original.id}`)}
+                                    className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors duration-150"
+                                >
+                                    <IconEye className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                                </button>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="text-xs">
+                                Xem chi tiết
+                            </TooltipContent>
+                        </Tooltip>
+
+                        {/* Edit button */}
+                        {onEdit && (
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <button
+                                        onClick={() => onEdit(row.original)}
+                                        className="p-1.5 rounded-full hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-colors duration-150"
+                                    >
+                                        <IconEdit className="h-4 w-4 text-blue-500 dark:text-blue-400" />
+                                    </button>
+                                </TooltipTrigger>
+                                <TooltipContent side="top" className="text-xs">
+                                    Chỉnh sửa
+                                </TooltipContent>
+                            </Tooltip>
+                        )}
+                    </TooltipProvider>
                 </div>
             )
         },
-        size: 60,
+        size: 100,
     },
 ]
