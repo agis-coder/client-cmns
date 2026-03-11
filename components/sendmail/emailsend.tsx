@@ -1,13 +1,13 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import React, { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { MoreHorizontal, ChevronDown } from "lucide-react"
+import { MoreHorizontal, ChevronDown, Search, X, Inbox } from "lucide-react"
 import EmailEditor from "./EmailEditor"
 import { sendBulkMail } from "@/services/customer-data"
 import { toast } from "sonner"
@@ -96,10 +96,27 @@ export default function EmailSender() {
         toast.success(`Đã chuyển email sang ${toType.toUpperCase()}`)
     }
 
-    const handleSaveDraft = () => {
-        const draft = { to, cc, bcc, subject, html, text }
-        localStorage.setItem("mail_draft", JSON.stringify(draft))
-        toast.success("Đã lưu nháp")
+    const [searchTerm, setSearchTerm] = React.useState('')
+
+    // Filter emails based on search term
+    const filteredEmails = React.useMemo(() => {
+        const currentList = activeTab === 'to' ? to : activeTab === 'cc' ? cc : bcc
+
+        if (!searchTerm.trim()) return currentList
+
+        return currentList.filter(email =>
+            email.toLowerCase().includes(searchTerm.toLowerCase())
+        )
+    }, [activeTab, to, cc, bcc, searchTerm])
+
+    // Reset search when changing tabs
+    React.useEffect(() => {
+        setSearchTerm('')
+    }, [activeTab])
+
+    // Thêm prop onCancel nếu cần
+    interface Props {
+        onCancel?: () => void
     }
 
     const handleSend = async () => {
@@ -260,9 +277,10 @@ export default function EmailSender() {
 
             <CardContent className="space-y-4 pt-4">
                 <div className="border border-gray-200 rounded-lg overflow-hidden">
+                    {/* Tabs */}
                     <div className="flex border-b border-gray-200 bg-gray-50">
                         <button
-                            className={`px-4 py-2 text-sm font-medium transition-colors ${activeTab === 'to'
+                            className={`px-4 py-2 text-sm font-medium transition-colors flex-1 sm:flex-none ${activeTab === 'to'
                                 ? 'text-gray-900 border-b-2 border-gray-900 bg-white'
                                 : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
                                 }`}
@@ -271,7 +289,7 @@ export default function EmailSender() {
                             To ({to.length})
                         </button>
                         <button
-                            className={`px-4 py-2 text-sm font-medium transition-colors ${activeTab === 'cc'
+                            className={`px-4 py-2 text-sm font-medium transition-colors flex-1 sm:flex-none ${activeTab === 'cc'
                                 ? 'text-gray-900 border-b-2 border-gray-900 bg-white'
                                 : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
                                 }`}
@@ -280,7 +298,7 @@ export default function EmailSender() {
                             CC ({cc.length})
                         </button>
                         <button
-                            className={`px-4 py-2 text-sm font-medium transition-colors ${activeTab === 'bcc'
+                            className={`px-4 py-2 text-sm font-medium transition-colors flex-1 sm:flex-none ${activeTab === 'bcc'
                                 ? 'text-gray-900 border-b-2 border-gray-900 bg-white'
                                 : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
                                 }`}
@@ -290,82 +308,202 @@ export default function EmailSender() {
                         </button>
                     </div>
 
-                    <div className="max-h-48 overflow-y-auto">
+                    {/* Search Bar */}
+                    <div className="p-3 border-b border-gray-200 bg-white">
+                        <div className="relative">
+                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                            <Input
+                                type="text"
+                                placeholder={`Tìm kiếm trong danh sách ${activeTab.toUpperCase()}...`}
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="pl-9 pr-8 py-2 w-full border rounded-md focus:outline-none focus:ring-2 focus:ring-black/20 text-sm"
+                            />
+                            {searchTerm && (
+                                <button
+                                    onClick={() => setSearchTerm('')}
+                                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Table */}
+                    <div className="max-h-[300px] overflow-y-auto">
                         <table className="w-full text-sm">
-                            <thead className="bg-gray-50 border-b border-gray-200">
+                            <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
                                 <tr>
                                     <th className="text-left p-3 text-gray-600 font-medium">Email</th>
-                                    <th className="text-right p-3 text-gray-600 font-medium w-[140px]">Thao tác</th>
+                                    <th className="text-right p-3 text-gray-600 font-medium w-[120px]">Thao tác</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {activeTab === 'to' && to.length === 0 && (
-                                    <tr>
-                                        <td colSpan={2} className="text-center p-4 text-gray-500">
-                                            Chưa có email trong danh sách To
-                                        </td>
-                                    </tr>
+                                {activeTab === 'to' && (
+                                    <>
+                                        {to.length === 0 ? (
+                                            <tr>
+                                                <td colSpan={2} className="text-center p-8 text-gray-500">
+                                                    <div className="flex flex-col items-center gap-2">
+                                                        <Inbox className="w-8 h-8 text-gray-300" />
+                                                        <span>Chưa có email trong danh sách To</span>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ) : (
+                                            <>
+                                                {filteredEmails.length === 0 && searchTerm ? (
+                                                    <tr>
+                                                        <td colSpan={2} className="text-center p-8 text-gray-500">
+                                                            <div className="flex flex-col items-center gap-2">
+                                                                <Search className="w-8 h-8 text-gray-300" />
+                                                                <span>Không tìm thấy email "{searchTerm}"</span>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                ) : (
+                                                    filteredEmails.map((email) => renderEmailRow(email, 'to'))
+                                                )}
+                                            </>
+                                        )}
+                                    </>
                                 )}
 
-                                {activeTab === 'to' && to.map((email) => renderEmailRow(email, 'to'))}
-
-                                {activeTab === 'cc' && cc.length === 0 && (
-                                    <tr>
-                                        <td colSpan={2} className="text-center p-4 text-gray-500">
-                                            Chưa có email trong danh sách CC
-                                        </td>
-                                    </tr>
+                                {activeTab === 'cc' && (
+                                    <>
+                                        {cc.length === 0 ? (
+                                            <tr>
+                                                <td colSpan={2} className="text-center p-8 text-gray-500">
+                                                    <div className="flex flex-col items-center gap-2">
+                                                        <Inbox className="w-8 h-8 text-gray-300" />
+                                                        <span>Chưa có email trong danh sách CC</span>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ) : (
+                                            <>
+                                                {filteredEmails.length === 0 && searchTerm ? (
+                                                    <tr>
+                                                        <td colSpan={2} className="text-center p-8 text-gray-500">
+                                                            <div className="flex flex-col items-center gap-2">
+                                                                <Search className="w-8 h-8 text-gray-300" />
+                                                                <span>Không tìm thấy email "{searchTerm}"</span>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                ) : (
+                                                    filteredEmails.map((email) => renderEmailRow(email, 'cc'))
+                                                )}
+                                            </>
+                                        )}
+                                    </>
                                 )}
 
-                                {activeTab === 'cc' && cc.map((email) => renderEmailRow(email, 'cc'))}
-
-                                {activeTab === 'bcc' && bcc.length === 0 && (
-                                    <tr>
-                                        <td colSpan={2} className="text-center p-4 text-gray-500">
-                                            Chưa có email trong danh sách BCC
-                                        </td>
-                                    </tr>
+                                {activeTab === 'bcc' && (
+                                    <>
+                                        {bcc.length === 0 ? (
+                                            <tr>
+                                                <td colSpan={2} className="text-center p-8 text-gray-500">
+                                                    <div className="flex flex-col items-center gap-2">
+                                                        <Inbox className="w-8 h-8 text-gray-300" />
+                                                        <span>Chưa có email trong danh sách BCC</span>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ) : (
+                                            <>
+                                                {filteredEmails.length === 0 && searchTerm ? (
+                                                    <tr>
+                                                        <td colSpan={2} className="text-center p-8 text-gray-500">
+                                                            <div className="flex flex-col items-center gap-2">
+                                                                <Search className="w-8 h-8 text-gray-300" />
+                                                                <span>Không tìm thấy email "{searchTerm}"</span>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                ) : (
+                                                    filteredEmails.map((email) => renderEmailRow(email, 'bcc'))
+                                                )}
+                                            </>
+                                        )}
+                                    </>
                                 )}
-
-                                {activeTab === 'bcc' && bcc.map((email) => renderEmailRow(email, 'bcc'))}
                             </tbody>
                         </table>
                     </div>
+
+                    {/* Footer */}
+                    {(activeTab === 'to' && to.length > 0) ||
+                        (activeTab === 'cc' && cc.length > 0) ||
+                        (activeTab === 'bcc' && bcc.length > 0) ? (
+                        <div className="border-t border-gray-200 bg-gray-50 p-3 text-xs text-gray-500">
+                            <div className="flex justify-between items-center">
+                                <span>
+                                    Tổng: {activeTab === 'to' ? to.length : activeTab === 'cc' ? cc.length : bcc.length} email
+                                </span>
+                                {searchTerm && (
+                                    <span className="text-gray-600">
+                                        Tìm thấy {filteredEmails.length} kết quả
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+                    ) : null}
                 </div>
 
-                <Input
-                    placeholder="Tiêu đề email"
-                    value={subject}
-                    onChange={(e) => setSubject(e.target.value)}
-                    className="border-gray-200 focus:border-gray-400 focus:ring-gray-400"
-                />
-
-                <div className="border border-gray-200 rounded-lg overflow-hidden">
-                    <EmailEditor
-                        onChange={(html, text) => {
-                            setHtml(html)
-                            setText(text)
-                        }}
+                {/* Email Subject */}
+                <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">Tiêu đề email</label>
+                    <Input
+                        placeholder="Nhập tiêu đề email..."
+                        value={subject}
+                        onChange={(e) => setSubject(e.target.value)}
+                        className="border-gray-200 focus:border-gray-400 focus:ring-gray-400"
                     />
                 </div>
 
-                <div className="flex items-center gap-3 pt-2">
-                    <Button
-                        onClick={handleSend}
-                        disabled={loading}
-                        className="bg-gray-900 text-white hover:bg-gray-800 px-6"
-                    >
-                        {loading ? (
-                            <span className="flex items-center gap-2">
-                                <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                Đang gửi...
-                            </span>
-                        ) : (
-                            `Gửi email (${to.length + cc.length + bcc.length})`
-                        )}
-                    </Button>
+                {/* Email Editor */}
+                <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">Nội dung email</label>
+                    <div className="border border-gray-200 rounded-lg overflow-hidden">
+                        <EmailEditor
+                            onChange={(html, text) => {
+                                setHtml(html)
+                                setText(text)
+                            }}
+                        />
+                    </div>
+                </div>
 
-
+                {/* Actions */}
+                <div className="flex items-center justify-between gap-3 pt-4 border-t border-gray-200">
+                    <div className="text-sm text-gray-500">
+                        {to.length + cc.length + bcc.length} người nhận
+                    </div>
+                    <div className="flex items-center gap-3">
+                        {/* <Button
+                            variant="outline"
+                            onClick={onCancel}
+                            className="border-gray-200 hover:bg-gray-50"
+                        >
+                            Hủy
+                        </Button> */}
+                        <Button
+                            onClick={handleSend}
+                            disabled={loading || (!to.length && !cc.length && !bcc.length) || !subject || !html}
+                            className="bg-gray-900 text-white hover:bg-gray-800 px-6 min-w-[120px]"
+                        >
+                            {loading ? (
+                                <span className="flex items-center gap-2">
+                                    <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                    Đang gửi...
+                                </span>
+                            ) : (
+                                'Gửi email'
+                            )}
+                        </Button>
+                    </div>
                 </div>
             </CardContent>
         </Card>

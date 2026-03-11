@@ -942,7 +942,7 @@ export default function CustomerDetail({ customer }: CustomerDetailProps) {
                                                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-gray-400 focus:outline-none bg-white"
                                             >
                                                 <option value="">Chọn nguồn</option>
-                                                <option value="BDS">BDS</option>
+                                                <option value="BĐS">BDS</option>
                                                 <option value="GUI_TIET_KIEM">Gửi tiết kiệm</option>
                                                 <option value="XE_HOI">Xe hơi</option>
                                                 <option value="CHUNG_KHOAN">Chứng khoán</option>

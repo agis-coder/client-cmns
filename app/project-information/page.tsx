@@ -4,7 +4,7 @@ import { getProjectsByCategory } from "@/services/project-data"
 import { ProjectCategory } from "@/interfaces/project-category"
 
 export default async function Page() {
-    const initialCategory = ProjectCategory.BDS
+    const initialCategory = ProjectCategory.BĐS
 
     const initialData = await getProjectsByCategory(initialCategory)
 

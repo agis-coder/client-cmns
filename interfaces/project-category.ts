@@ -1,5 +1,5 @@
 export enum ProjectCategory {
-    BDS = "BDS",
+    BĐS = "BĐS",
     GUI_TIET_KIEM = "GUI_TIET_KIEM",
     XE_HOI = "XE_HOI",
     CHUNG_KHOAN = "CHUNG_KHOAN",
@@ -17,7 +17,7 @@ export enum ProjectCategory {
 }
 
 export const CATEGORY_TITLE: Record<ProjectCategory, string> = {
-    BDS: "Bất Động Sản",
+    BĐS: "Bất Động Sản",
     GUI_TIET_KIEM: "Gửi Tiết Kiệm",
     XE_HOI: "Xe Hơi",
     CHUNG_KHOAN: "Chứng Khoán",

@@ -1,6 +1,6 @@
 // enums/project-category.ts
 export enum ProjectCategory {
-    BDS = 'BDS',
+    BĐS = 'BĐS',
     GUI_TIET_KIEM = 'GUI_TIET_KIEM',
     XE_HOI = 'XE_HOI',
     CHUNG_KHOAN = 'CHUNG_KHOAN',

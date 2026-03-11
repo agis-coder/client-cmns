@@ -45,7 +45,7 @@ export const normalizeSearch = (value: string) => {
 
 export const getSourceLabel = (source: string): string => {
   const sourceLabels: Record<ProjectCategory, string> = {
-    [ProjectCategory.BDS]: "Bất động sản",
+    [ProjectCategory.BĐS]: "Bất động sản",
     [ProjectCategory.GUI_TIET_KIEM]: "Gửi tiết kiệm",
     [ProjectCategory.XE_HOI]: "Xe hơi",
     [ProjectCategory.CHUNG_KHOAN]: "Chứng khoán",

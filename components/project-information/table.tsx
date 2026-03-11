@@ -10,7 +10,7 @@ import {
     InvestorData,
 } from "@/interfaces/project-category"
 import { getProjectsByCategory } from "@/services/project-data"
-import { User, Mail, Phone, X, ChevronLeft, ChevronRight, Search } from "lucide-react"
+import { User, Mail, Phone, X, ChevronLeft, ChevronRight, Search, Loader2 } from "lucide-react"
 import { getListCustomerByProject } from "@/services/customer-data"
 import { Input } from "@/components/ui/input"
 import { Button } from "../ui/button"
@@ -285,17 +285,9 @@ export function ProjectBrowser({
                             </button>
                         </div>
 
-                        {selectedEmails.length > 0 && (
-                            <Button
-                                onClick={() => {
-                                    sessionStorage.setItem("mail_recipients", JSON.stringify(selectedEmails))
-                                    router.push("/sendmail")
-                                }}
-                            >
-                                Gửi mail ({selectedEmails.length})
-                            </Button>
-                        )}
-                        <div className="px-6 py-4 border-b">
+                        {/* Search và Actions */}
+                        <div className="px-6 py-4 border-b space-y-3">
+                            {/* Search Bar */}
                             <div className="relative">
                                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                                 <Input
@@ -304,90 +296,113 @@ export function ProjectBrowser({
                                     value={searchTerm}
                                     onChange={(e) => {
                                         setSearchTerm(e.target.value)
-                                        setCurrentPage(1) // Reset to first page when searching
+                                        setCurrentPage(1)
                                     }}
-                                    className="pl-10 pr-4 py-2 w-full border rounded-md focus:outline-none focus:ring-2 focus:ring-black/20"
+                                    className="pl-10 pr-4 py-2 w-full border rounded-lg focus:outline-none focus:ring-2 focus:ring-black/20"
                                 />
                             </div>
-                            {searchTerm && (
-                                <div className="mt-2 text-sm text-gray-500">
-                                    Tìm thấy {filteredCustomers.length} kết quả cho "{searchTerm}"
-                                </div>
-                            )}
+
+                            {/* Action Buttons */}
+                            <div className="flex items-center justify-between">
+                                {selectedEmails.length > 0 && (
+                                    <Button
+                                        onClick={() => {
+                                            sessionStorage.setItem("mail_recipients", JSON.stringify(selectedEmails))
+                                            router.push("/sendmail")
+                                        }}
+                                        className="bg-black text-white hover:bg-gray-800 px-4 py-2 rounded-md text-sm font-medium transition"
+                                    >
+                                        Gửi mail ({selectedEmails.length})
+                                    </Button>
+                                )}
+
+                                {searchTerm && (
+                                    <div className="text-sm text-gray-500 ml-auto">
+                                        Tìm thấy <span className="font-medium text-black">{filteredCustomers.length}</span> kết quả cho "{searchTerm}"
+                                    </div>
+                                )}
+                            </div>
                         </div>
 
                         {/* Modal Body */}
                         <div className="flex-1 overflow-hidden p-6 pt-0">
                             {modalLoading ? (
                                 <div className="h-full flex items-center justify-center">
-                                    <div className="text-gray-500">Đang tải dữ liệu...</div>
+                                    <div className="flex items-center gap-2 text-gray-500">
+                                        <Loader2 className="w-5 h-5 animate-spin" />
+                                        <span>Đang tải dữ liệu...</span>
+                                    </div>
                                 </div>
                             ) : (
                                 <>
                                     {/* Table */}
-                                    <ScrollArea className="h-[calc(90vh-280px)]">
-                                        <table className="w-full border-collapse">
-                                            <th className="px-4 py-3 border-b text-center w-10">
-                                                <input
-                                                    type="checkbox"
-                                                    onChange={toggleSelectAll}
-                                                    checked={
-                                                        currentCustomers
-                                                            .filter((c) => c.email)
-                                                            .every((c) => selectedEmails.includes(c.email))
-                                                    }
-                                                />
-                                            </th>
+                                    <ScrollArea className="h-[calc(90vh-320px)] border rounded-lg">
+                                        <table className="w-full border-collapse table-fixed">
                                             <thead className="bg-gray-50 sticky top-0 z-10">
                                                 <tr>
-                                                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600 border-b min-w-[200px]">Tên khách hàng</th>
-                                                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600 border-b w-32">Số điện thoại</th>
-                                                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600 border-b w-32">Email</th>
-                                                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600 border-b min-w-[300px]">Địa chỉ</th>
-                                                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600 border-b w-20">Số căn đã mua</th>
+                                                    <th className="px-4 py-3 border-b text-center w-12">
+                                                        <input
+                                                            type="checkbox"
+                                                            onChange={toggleSelectAll}
+                                                            checked={
+                                                                currentCustomers
+                                                                    .filter((c) => c.email)
+                                                                    .every((c) => selectedEmails.includes(c.email)) &&
+                                                                currentCustomers.filter((c) => c.email).length > 0
+                                                            }
+                                                            className="w-4 h-4 rounded border-gray-300 text-black focus:ring-black"
+                                                        />
+                                                    </th>
+                                                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600 border-b w-1/4">Tên khách hàng</th>
+                                                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600 border-b w-36">Số điện thoại</th>
+                                                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600 border-b w-56">Email</th>
+                                                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600 border-b w-2/5">Địa chỉ</th>
+                                                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600 border-b w-24">Số căn đã mua</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
                                                 {currentCustomers.map((customer) => (
                                                     <tr key={customer.customer_id} className="hover:bg-gray-50 transition group">
-                                                        <td className="px-4 py-3 border-b text-center">
-                                                            {customer.email && (
+                                                        <td className="px-4 py-3 border-b text-center w-12">
+                                                            {customer.email ? (
                                                                 <input
                                                                     type="checkbox"
                                                                     checked={selectedEmails.includes(customer.email)}
                                                                     onChange={() => toggleSelectEmail(customer.email)}
-                                                                    className="w-4 h-4"
+                                                                    className="w-4 h-4 rounded border-gray-300 text-black focus:ring-black"
                                                                 />
+                                                            ) : (
+                                                                <span className="text-gray-300 text-xs">-</span>
                                                             )}
                                                         </td>
                                                         <td className="px-4 py-3 text-sm font-medium border-b">
-                                                            <div className="truncate max-w-[200px]" title={customer.customer_name}>
+                                                            <div className="break-words pr-2" title={customer.customer_name}>
                                                                 {customer.customer_name}
                                                                 {searchTerm && customer.customer_name.toLowerCase().includes(searchTerm.toLowerCase()) && (
-                                                                    <span className="ml-2 text-xs text-blue-600 font-normal">(tên)</span>
+                                                                    <span className="ml-2 text-xs text-blue-600 font-normal whitespace-nowrap bg-blue-50 px-1.5 py-0.5 rounded">tên</span>
                                                                 )}
                                                             </div>
                                                         </td>
                                                         <td className="px-4 py-3 text-sm border-b">
-                                                            <span className="font-mono text-gray-600">
+                                                            <div className="font-mono text-gray-600 break-words" title={customer.phone}>
                                                                 {customer.phone || "-"}
-                                                            </span>
+                                                            </div>
                                                         </td>
                                                         <td className="px-4 py-3 text-sm border-b">
-                                                            <span className="font-mono text-gray-600">
+                                                            <div className="font-mono text-gray-600 break-words pr-2" title={customer.email}>
                                                                 {customer.email || "-"}
-                                                            </span>
+                                                            </div>
                                                         </td>
                                                         <td className="px-4 py-3 text-sm border-b">
-                                                            <div className="truncate max-w-[300px] text-gray-600" title={customer.address || ""}>
+                                                            <div className="break-words pr-2 text-gray-600" title={customer.address || ""}>
                                                                 {customer.address || "-"}
                                                                 {searchTerm && customer.address?.toLowerCase().includes(searchTerm.toLowerCase()) && (
-                                                                    <span className="ml-2 text-xs text-blue-600 font-normal">(địa chỉ)</span>
+                                                                    <span className="ml-2 text-xs text-blue-600 font-normal whitespace-nowrap bg-blue-50 px-1.5 py-0.5 rounded">địa chỉ</span>
                                                                 )}
                                                             </div>
                                                         </td>
                                                         <td className="px-4 py-3 text-sm border-b">
-                                                            <Badge variant="secondary" className="bg-gray-100">
+                                                            <Badge variant="secondary" className="bg-gray-100 w-16 text-center block mx-auto">
                                                                 {customer.total_units}
                                                             </Badge>
                                                         </td>
@@ -397,8 +412,11 @@ export function ProjectBrowser({
                                         </table>
 
                                         {filteredCustomers.length === 0 && (
-                                            <div className="text-center py-12 text-gray-400">
-                                                {searchTerm ? "Không tìm thấy khách hàng phù hợp" : "Không có dữ liệu khách hàng"}
+                                            <div className="text-center py-16 text-gray-400">
+                                                <div className="text-5xl mb-3">😕</div>
+                                                <div className="text-sm">
+                                                    {searchTerm ? "Không tìm thấy khách hàng phù hợp" : "Không có dữ liệu khách hàng"}
+                                                </div>
                                             </div>
                                         )}
                                     </ScrollArea>
@@ -407,9 +425,9 @@ export function ProjectBrowser({
                                     {filteredCustomers.length > 0 && (
                                         <div className="mt-4 flex items-center justify-between border-t pt-4 bg-white">
                                             <div className="text-sm text-gray-500">
-                                                Hiển thị <span className="font-medium">{startIndex + 1}</span> -{' '}
-                                                <span className="font-medium">{Math.min(endIndex, filteredCustomers.length)}</span> /{' '}
-                                                <span className="font-medium">{filteredCustomers.length}</span> khách hàng
+                                                Hiển thị <span className="font-medium text-black">{startIndex + 1}</span> -{' '}
+                                                <span className="font-medium text-black">{Math.min(endIndex, filteredCustomers.length)}</span> /{' '}
+                                                <span className="font-medium text-black">{filteredCustomers.length}</span> khách hàng
                                             </div>
                                             <div className="flex items-center gap-1">
                                                 <button
@@ -442,7 +460,7 @@ export function ProjectBrowser({
                                                                 className={cn(
                                                                     "min-w-[36px] h-9 rounded-md text-sm transition font-medium",
                                                                     currentPage === page
-                                                                        ? "bg-black text-white"
+                                                                        ? "bg-black text-white hover:bg-gray-800"
                                                                         : "hover:bg-gray-100 text-gray-700"
                                                                 )}
                                                             >

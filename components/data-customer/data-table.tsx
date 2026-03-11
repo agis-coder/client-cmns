@@ -50,7 +50,9 @@ export function DataTable({ data }: DataTableProps) {
 
   const [totalPages, setTotalPages] = React.useState(1)
 
-  const [sourceFilter, setSourceFilter] = React.useState<ProjectCategory | "all">("all")
+  // Lấy giá trị BĐS đầu tiên từ ProjectCategory
+  const firstProjectCategory = Object.values(ProjectCategory)[0] || "all"
+  const [sourceFilter, setSourceFilter] = React.useState<ProjectCategory | "all">(firstProjectCategory)
   const [investorFilter, setInvestorFilter] = React.useState("all")
   const [projectFilter, setProjectFilter] = React.useState<string | "all">("all")
 
