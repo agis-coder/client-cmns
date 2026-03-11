@@ -42,21 +42,13 @@ const data = {
       url: "/excels",
       icon: IconChartBar,
     },
-    // {
-    //   title: "Tải video từ URL",
-    //   url: "/downvideo",
-    //   icon: IconDatabase,
-    // },
+
     {
       title: "Gửi Mail nhiều khách hàng",
       url: "/sendmail",
       icon: IconMailbox,
     },
-    // {
-    //   title: "Quản lý điện thoại",
-    //   url: "/phone-manager",
-    //   icon: IconPhoneCheck,
-    // }
+
   ]
 }
 

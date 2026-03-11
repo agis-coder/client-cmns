@@ -1,4 +1,3 @@
-// components/data-customer/data-table.tsx
 "use client"
 import * as React from "react"
 import { flexRender, getCoreRowModel, useReactTable } from "@tanstack/react-table"
@@ -17,6 +16,7 @@ import { useRouter } from "next/navigation"
 import { CustomerUpdatePopup } from "./customer-update-popup"
 import * as XLSX from "xlsx"
 import { saveAs } from "file-saver"
+import CreateCustomerPopup from "./add-customer"
 
 const getProjectSources = (projects: any): string[] => {
   if (!Array.isArray(projects)) return []
@@ -37,22 +37,22 @@ export function DataTable({ data }: DataTableProps) {
 
   const [tableData, setTableData] = React.useState<any[]>((data as any).data ?? [])
   const [search, setSearch] = React.useState("")
-  const debouncedSearch = useDebounce(search, 300)
+  const debouncedSearch = useDebounce(search, 1000)
+  const [openPopup, setOpenPopup] = React.useState(false)
 
-  const [quickFilter, setQuickFilter] = React.useState<"all" | "birthday_today" | "birthday_tomorrow" | "purchase_most" | "purchase_least" | "country_vn" | "country_nn"
+  const [quickFilter, setQuickFilter] = React.useState<"all" | "birthday_today" | "birthday_tomorrow" | "purchase_most" | "purchase_least" | "country_vn" | "country_nn" | "have_email" | "not_email"
   >("all")
 
   const birthdayFilter = quickFilter === "birthday_today" ? "today" : quickFilter === "birthday_tomorrow" ? "tomorrow" : undefined
   const purchaseSort = quickFilter === "purchase_most" ? "most" : quickFilter === "purchase_least" ? "least" : undefined
   const countryFilter = quickFilter === "country_vn" ? "vn" : quickFilter === "country_nn" ? "nn" : undefined
+  const emailFilter = quickFilter === "have_email" ? "yes" : quickFilter === "not_email" ? "no" : undefined
 
   const [totalPages, setTotalPages] = React.useState(1)
-  const pageSize = 100
 
-  const [sourceFilter, setSourceFilter] = React.useState<ProjectCategory | "all">(ProjectCategory.BDS)
+  const [sourceFilter, setSourceFilter] = React.useState<ProjectCategory | "all">("all")
   const [investorFilter, setInvestorFilter] = React.useState("all")
   const [projectFilter, setProjectFilter] = React.useState<string | "all">("all")
-
 
   const [investorOptions, setInvestorOptions] = React.useState<string[]>([])
   const [projectOptions, setProjectOptions] = React.useState<Project[]>([])
@@ -61,12 +61,18 @@ export function DataTable({ data }: DataTableProps) {
   const [rowSelection, setRowSelection] = React.useState({})
 
   React.useEffect(() => {
-    fetchProjectsBySource(sourceFilter === "all" ? undefined : sourceFilter)
+    if (sourceFilter === "all") {
+      setInvestorOptions([])
+      setInvestorFilter("all")
+      return
+    }
+
+    fetchProjectsBySource(sourceFilter)
       .then((data) => {
         setInvestorOptions(data)
+        setInvestorFilter("all")
       })
   }, [sourceFilter])
-
 
   React.useEffect(() => {
     if (investorFilter === "all") {
@@ -87,27 +93,31 @@ export function DataTable({ data }: DataTableProps) {
     })
   }, [investorFilter])
 
-  React.useEffect(() => {
+  const fetchData = React.useCallback(async () => {
     setLoading(true)
+    try {
+      const res = await fetchAllCustomers(
+        currentPage,
+        debouncedSearch || undefined,
+        sourceFilter !== "all" ? sourceFilter : undefined,
+        projectFilter !== "all" ? projectFilter : undefined,
+        countryFilter,
+        birthdayFilter,
+        purchaseSort,
+        emailFilter
+      )
+      setTableData(res.data ?? [])
+      setTotalPages(res.totalPages ?? 1)
+    } catch (error) {
+      console.error("Error fetching customers:", error)
+    } finally {
+      setLoading(false)
+    }
+  }, [currentPage, debouncedSearch, sourceFilter, projectFilter, countryFilter, birthdayFilter, purchaseSort, emailFilter])
 
-    fetchAllCustomers(
-      currentPage,
-      debouncedSearch || undefined,
-      investorFilter !== "all" ? investorFilter : undefined,
-      projectFilter !== "all" ? projectFilter : undefined,
-      countryFilter,
-      birthdayFilter,
-      purchaseSort
-    )
-      .then((res) => {
-        setTableData(res.data ?? [])
-        setTotalPages(res.totalPages ?? 1)
-      })
-      .finally(() => {
-        setLoading(false)
-      })
-
-  }, [currentPage, debouncedSearch, investorFilter, projectFilter, quickFilter]) // Thêm investorFilter và projectFilter vào dependencies
+  React.useEffect(() => {
+    fetchData()
+  }, [fetchData])
 
   const paginatedData = React.useMemo(() =>
     tableData.map((c: any) => ({
@@ -124,27 +134,19 @@ export function DataTable({ data }: DataTableProps) {
   }
 
   const handleUpdateSuccess = () => {
-    // Refresh data after update
-    setLoading(true)
-    fetchAllCustomers(
-      currentPage,
-      debouncedSearch || undefined,
-      investorFilter !== "all" ? investorFilter : undefined,
-      projectFilter !== "all" ? projectFilter : undefined,
-      countryFilter,
-      birthdayFilter,
-      purchaseSort
-    )
-      .then((res) => {
-        setTableData(res.data ?? [])
-        setTotalPages(res.totalPages ?? 1)
-      })
-      .finally(() => {
-        setLoading(false)
-      })
+    fetchData()
   }
 
-  // Tạo columns với handleEdit
+  const handleCustomerCreated = (newCustomer: any) => {
+    const enhancedCustomer = {
+      ...newCustomer,
+      relatives: newCustomer.relatives ?? [],
+      projects: newCustomer.projects ?? [],
+      projectSources: getProjectSources(newCustomer.projects),
+    }
+    setTableData(prev => [enhancedCustomer, ...prev])
+  }
+
   const columns = React.useMemo(
     () => createColumns(handleEdit),
     [handleEdit]
@@ -152,7 +154,7 @@ export function DataTable({ data }: DataTableProps) {
 
   const table = useReactTable({
     data: paginatedData,
-    columns, // Sử dụng columns đã tạo
+    columns,
     getCoreRowModel: getCoreRowModel(),
     enableRowSelection: true,
     onRowSelectionChange: setRowSelection,
@@ -166,7 +168,6 @@ export function DataTable({ data }: DataTableProps) {
   )
 
   const exportToExcel = () => {
-
     const exportData = paginatedData.map((c) => ({
       "Họ và tên": c.customer_name || "",
       "Email": c.email || "",
@@ -177,25 +178,37 @@ export function DataTable({ data }: DataTableProps) {
     }))
 
     const worksheet = XLSX.utils.json_to_sheet(exportData)
-
     const workbook = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(workbook, worksheet, "Customers")
-
     const excelBuffer = XLSX.write(workbook, {
       bookType: "xlsx",
       type: "array",
     })
-
     const blob = new Blob([excelBuffer], {
       type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     })
-
     saveAs(blob, `customers_${Date.now()}.xlsx`)
   }
 
   return (
     <>
       <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <h2 className="text-lg font-semibold">Danh sách khách hàng</h2>
+          <Button
+            onClick={() => setOpenPopup(true)}
+            className="bg-gray-900 text-white hover:bg-gray-800"
+          >
+            + Thêm khách hàng
+          </Button>
+        </div>
+
+        <CreateCustomerPopup
+          open={openPopup}
+          onOpenChange={setOpenPopup}
+          onSuccess={handleCustomerCreated}
+        />
+
         <div className="flex flex-wrap gap-2">
           <div className="relative flex-1">
             <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -229,6 +242,8 @@ export function DataTable({ data }: DataTableProps) {
               { value: "purchase_least", label: "Khách hàng mua ít nhất" },
               { value: "country_vn", label: "Khách người Việt Nam" },
               { value: "country_nn", label: "Khách người Nước ngoài" },
+              { value: "have_email", label: "Khách hàng có Email" },
+              { value: "not_email", label: "Khách hàng không có Email" },
             ]}
           />
 
@@ -236,10 +251,13 @@ export function DataTable({ data }: DataTableProps) {
             value={sourceFilter}
             onChange={(v) => setSourceFilter(v as "all" | ProjectCategory)}
             title="Danh mục"
-            options={Object.values(ProjectCategory).map((c) => ({
-              value: c,
-              label: getSourceLabel(c),
-            }))}
+            options={[
+              { value: "all", label: "Tất cả danh mục" },
+              ...Object.values(ProjectCategory).map((c) => ({
+                value: c,
+                label: getSourceLabel(c),
+              }))
+            ]}
           />
 
           <Combobox
@@ -247,10 +265,13 @@ export function DataTable({ data }: DataTableProps) {
             onChange={setInvestorFilter}
             title="Chủ đầu tư"
             disabled={sourceFilter === "all"}
-            options={investorOptions.map((i) => ({
-              value: i,
-              label: i,
-            })) ?? []}
+            options={[
+              { value: "all", label: "Tất cả chủ đầu tư" },
+              ...(investorOptions.map((i) => ({
+                value: i,
+                label: i,
+              })) ?? [])
+            ]}
           />
 
           <Combobox
@@ -258,14 +279,19 @@ export function DataTable({ data }: DataTableProps) {
             onChange={(v: string) => setProjectFilter(v)}
             title="Dự án"
             disabled={investorFilter === "all" || projectOptions.length === 0}
-            options={projectOptions.map((p) => ({
-              value: String(p.id),
-              label: p.project_name,
-            }))}
+            options={[
+              { value: "all", label: "Tất cả dự án" },
+              ...(projectOptions.map((p) => ({
+                value: String(p.id),
+                label: p.project_name,
+              })))
+            ]}
           />
 
           {selectedEmails.length > 0 && (
             <Button
+              variant={'ghost'}
+              className="pl-9 pr-9 h-12 border border-gray-200 dark:border-gray-800 outline-none focus:outline-none focus:ring-0 focus:border-gray-400 dark:focus:border-gray-600"
               onClick={() => {
                 sessionStorage.setItem("mail_recipients", JSON.stringify(selectedEmails))
                 router.push("/sendmail")
@@ -275,18 +301,16 @@ export function DataTable({ data }: DataTableProps) {
             </Button>
           )}
           <Button
-            variant="outline"
+            variant={'ghost'}
+            className="pl-9 pr-9 h-12 border border-gray-200 dark:border-gray-800 outline-none focus:outline-none focus:ring-0 focus:border-gray-400 dark:focus:border-gray-600"
             onClick={exportToExcel}
           >
             Xuất Excel
           </Button>
-
         </div>
 
         <div className="rounded-md border">
-
           <Table>
-
             <TableHeader>
               {table.getHeaderGroups().map((hg) => (
                 <TableRow key={hg.id}>
@@ -300,7 +324,6 @@ export function DataTable({ data }: DataTableProps) {
             </TableHeader>
 
             <TableBody>
-
               {loading ? (
                 <TableRow>
                   <TableCell colSpan={columns.length} className="text-center py-10">
@@ -327,15 +350,11 @@ export function DataTable({ data }: DataTableProps) {
                   </TableRow>
                 ))
               )}
-
             </TableBody>
-
           </Table>
-
         </div>
 
         <div className="flex justify-end items-center gap-2">
-
           <Button
             size="sm"
             variant="outline"
@@ -357,9 +376,7 @@ export function DataTable({ data }: DataTableProps) {
           >
             <IconChevronRight />
           </Button>
-
         </div>
-
       </div>
 
       <CustomerUpdatePopup

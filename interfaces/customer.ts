@@ -163,3 +163,24 @@ export interface CustomerUpdateData {
     business_field?: string | null
     isVip?: boolean | null
 }
+
+export interface CreateCustomerDto {
+    customer_name: string;
+    phone_number: string;
+    img_customer?: string;
+    date_of_birth?: string;
+    cccd?: string;
+    email?: string;
+    gender?: string;
+    address?: string;
+    permanent_address?: string;
+    living_area?: string;
+    the_product_type?: string;
+    nationality?: string;
+    marital_status?: string;
+    interest?: string;
+    total_assets?: number;
+    business_field?: string;
+    zalo_status?: string;
+    facebook?: string;
+}

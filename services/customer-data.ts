@@ -1,10 +1,11 @@
 import { CustomerApiResponse } from "@/interfaces/api";
-import { Customer, CustomerUpdateData, ImportResult, ImportType, ProjectsBySourceResponse, SubdivisionsBySourceResponse } from "@/interfaces/customer";
+import { CreateCustomerDto, Customer, CustomerUpdateData, ImportResult, ImportType, ProjectsBySourceResponse, SubdivisionsBySourceResponse } from "@/interfaces/customer";
 import { SendBulkMailPayload } from "@/interfaces/mail";
 import { api } from "@/lib/axios";
 
-export async function fetchAllCustomers(page: number, searchTerm?: string, source?: string, projectId?: string, country?: 'vn' | 'nn', birthday?: 'today' | 'tomorrow', sortByPurchase?: 'most' | 'least'): Promise<CustomerApiResponse> {
+export async function fetchAllCustomers(page: number, searchTerm?: string, source?: string, projectId?: string, country?: 'vn' | 'nn', birthday?: 'today' | 'tomorrow', sortByPurchase?: 'most' | 'least', hasEmail?: 'yes' | 'no' | 'all'): Promise<CustomerApiResponse> {
 
+    console.log('source:', source)
     const response = await api.get<CustomerApiResponse>('/customers', {
         params: {
             page,
@@ -15,10 +16,21 @@ export async function fetchAllCustomers(page: number, searchTerm?: string, sourc
             country: country || undefined,
             birthday: birthday || undefined,
             sortByPurchase: sortByPurchase || undefined,
+            hasEmail: hasEmail || undefined,
         },
     })
-    console.log('response.data:', response.data)
     return response.data
+}
+
+
+export async function createCustomer(data: CreateCustomerDto): Promise<any> {
+    try {
+        const response = await api.post('/customers', data);
+        return response.data;
+    } catch (error) {
+        console.error("Error creating customer:", error);
+        throw error;
+    }
 }
 
 export async function fetchCustomerById(id: string): Promise<Customer | null> {

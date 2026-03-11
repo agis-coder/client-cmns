@@ -1,40 +1,17 @@
 "use client"
-
 import * as React from "react"
 import { Check, ChevronDown, Search } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import {
-    Command,
-    CommandEmpty,
-    CommandGroup,
-    CommandInput,
-    CommandItem,
-} from "@/components/ui/command"
-import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger,
-} from "@/components/ui/popover"
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, } from "@/components/ui/command"
+import { Popover, PopoverContent, PopoverTrigger, } from "@/components/ui/popover"
 import { ComboboxProps } from "@/interfaces/system"
 
-export function Combobox({
-    value,
-    onChange,
-    options,
-    title,
-    placeholder = "Chọn...",
-    searchPlaceholder = "Tìm kiếm...",
-    disabled,
-    height = "300px",
-}: ComboboxProps) {
+export function Combobox({ value, onChange, options, title, placeholder = "Chọn...", searchPlaceholder = "Tìm kiếm...", disabled, height = "300px" }: ComboboxProps) {
     const [open, setOpen] = React.useState(false)
     const selectedOption = options.find((o) => o.value === value)
 
-    const displayValue =
-        !value || value === "all"
-            ? title || placeholder
-            : selectedOption?.label
+    const displayValue = !value || value === "all" ? title || placeholder : selectedOption?.label
 
     return (
         <Popover open={open} onOpenChange={setOpen}>
