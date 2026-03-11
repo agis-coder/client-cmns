@@ -37,7 +37,7 @@ export function DataTable({ data }: DataTableProps) {
 
   const [tableData, setTableData] = React.useState<any[]>((data as any).data ?? [])
   const [search, setSearch] = React.useState("")
-  const debouncedSearch = useDebounce(search, 1000)
+  const debouncedSearch = useDebounce(search, 3000)
   const [openPopup, setOpenPopup] = React.useState(false)
 
   const [quickFilter, setQuickFilter] = React.useState<"all" | "birthday_today" | "birthday_tomorrow" | "purchase_most" | "purchase_least" | "country_vn" | "country_nn" | "have_email" | "not_email"

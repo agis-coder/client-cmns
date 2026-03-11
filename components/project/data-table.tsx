@@ -100,7 +100,7 @@ export function DataTable({
         <Combobox
           value={category}
           onChange={(v) => setCategory(v)}
-          title="Danh mục dự án"
+          title="Danh mục dữ liệu"
           options={categoryOptions}
         />
       </div>
